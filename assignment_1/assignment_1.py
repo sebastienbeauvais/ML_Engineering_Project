@@ -2,6 +2,7 @@
 # import numpy as np
 import pandas as pd
 import plotly.express as px
+from sklearn.preprocessing import StandardScaler
 
 # import plotly.figure_factory as ff
 
@@ -80,3 +81,8 @@ hist.show()
 df = px.data.iris()
 box = px.box(df, y="sepal_length", color="species", title="Boxplot of iris data set")
 box.show()
+
+# Using Standard Scaler
+data = iris
+scaler = StandardScaler()
+print(scaler.fit(data))
