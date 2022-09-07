@@ -3,8 +3,15 @@ import numpy as np
 import pandas as pd
 import plotly.express as px
 from sklearn import datasets
+from sklearn.decomposition import PCA
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.linear_model import LogisticRegression
+
+# from sklearn import metrics
 from sklearn.model_selection import train_test_split
+from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
+from sklearn.tree import DecisionTreeClassifier
 
 # import plotly.figure_factory as ff
 
@@ -71,7 +78,8 @@ scatter = px.scatter(
     hover_data=["petal_width"],
     title="Scatter plot of iris data set",
 )
-scatter.show()
+scatter.write_html(file="scatter_plot.html", include_plotlyjs="cdn")
+# scatter.show()
 
 # plot 2 - violin plot
 df = px.data.iris()
@@ -84,7 +92,8 @@ violin = px.violin(
     # default violinmode is 'group' as in example above
     hover_data=df.columns,
 )
-violin.show()
+violin.write_html(file="violin_plot.html", include_plotlyjs="cdn")
+# violin.show()
 
 # plot 3 - scatter matrix
 df = px.data.iris()
@@ -97,7 +106,8 @@ scatter_matrix = px.scatter_matrix(
     labels={col: col.replace("_", " ") for col in df.columns},
 )  # remove underscore
 scatter_matrix.update_traces(diagonal_visible=False)
-scatter_matrix.show()
+scatter_matrix.write_html(file="scatter_matrix.html", include_plotlyjs="cdn")
+# scatter_matrix.show()
 
 # plot 4 - distribution plot
 df = px.data.iris()
@@ -110,14 +120,16 @@ hist = px.histogram(
     hover_data=df.columns,
     title="Distribution plot of iris data set",
 )
-hist.show()
+hist.write_html(file="hist_plot.html", include_plotlyjs="cdn")
+# hist.show()
 
 # plot 5 - boxplot
 df = px.data.iris()
 box = px.box(df, y="sepal_length", color="species", title="Boxplot of iris data set")
-box.show()
+box.write_html(file="box_plot.html", include_plotlyjs="cdn")
+# box.show()
 
-# Using Standard Scaler
+# Machine learning models
 # loading data (starting with fresh set in case of any alterations)
 iris = datasets.load_iris()
 
@@ -128,7 +140,10 @@ X = iris.data
 y = iris.target
 
 # splitting data into four new datasets (train, test for x and y)
-X_train, X_test, y_train, t_test = train_test_split(X, y, test_size=0.30)
+# X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.30)
+
+"""
+# Using Standard Scaler
 
 # load standard scaler
 scaler = StandardScaler()
@@ -138,6 +153,7 @@ scaler.fit(X_train)
 
 # scale the training data to be of mean 0 and of unit variance
 X_train_std = scaler.transform(X_train)
+#y_train_std = scaler.transform(y_train)
 
 # scale the test data to be of mean 0 and of unit variance
 X_test_std = scaler.transform(X_test)
@@ -148,3 +164,70 @@ print(X_train[0:5])
 print(X_train_std[0:5])
 print(X_test[0:5])
 print(X_test_std[0:5])
+
+# Fitting against random forest classifier
+# create a gaussian classifier
+clf = RandomForestClassifier(n_estimators=100)
+
+# train the model using the transformed data
+clf.fit(X_train, y_train)
+
+y_pred = clf.predict(X_test)
+
+# Model accuracy
+print("Accuracy of Random Forest Classifier: ", metrics.accuracy_score(y_test, y_pred))
+
+# trying another classifier
+# logistic regression
+
+# load logreg
+logreg = LogisticRegression()
+
+# compute mean and std dev of training sets
+logreg.fit(X_train, y_train)
+y_pred_lr = logreg.predict(X_test)
+
+# Model accuracy
+print("Accuracy of Logistic Regression Classifier: ", metrics.accuracy_score(y_test, y_pred_lr))
+"""
+
+# Using a sklearn Pipeline
+# setting up training and testing data
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.30)
+
+# chaining mulitple pipelines together
+pipeline_rf = Pipeline(
+    [
+        ("scaler1", StandardScaler()),
+        ("pca1", PCA(n_components=2)),
+        ("classification", RandomForestClassifier()),
+    ]
+)
+pipeline_lr = Pipeline(
+    [
+        ("scaler2", StandardScaler()),
+        ("pca2", PCA(n_components=2)),
+        ("lr_classifier", LogisticRegression()),
+    ]
+)
+pipeline_dt = Pipeline(
+    [
+        ("scaler3", StandardScaler()),
+        ("pca3", PCA(n_components=2)),
+        ("dt_classifier", DecisionTreeClassifier()),
+    ]
+)
+
+# a list of pipelines
+pipelines = [pipeline_rf, pipeline_lr, pipeline_dt]
+
+# a dictionary of pipeline names for printing later
+pipe_dict = {0: "Random Forest", 1: "Logistic Regression", 2: "Decision Tree"}
+
+# fit each model
+for pipe in pipelines:
+    pipe.fit(X_train, y_train)
+
+# print each models score
+for i, model in enumerate(pipelines):
+    print("{} Test Accuracy:\n{}".format(pipe_dict[i], model.score(X_test, y_test)))
