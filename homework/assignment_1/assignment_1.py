@@ -1,13 +1,11 @@
 # importing required libraries
-import numpy as np
+# import numpy as np
 import pandas as pd
 import plotly.express as px
 from sklearn import datasets
 from sklearn.decomposition import PCA
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.linear_model import LogisticRegression
-
-# from sklearn import metrics
 from sklearn.model_selection import train_test_split
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
@@ -30,40 +28,12 @@ print("\n")
 # using describe() for a quick output
 # print(iris.describe())
 
-# or use mean(), min(), max(), std()
-# Sepal Length
-print("Sepal length stats:")
-print("Mean of sepal length: ", iris["sepal_length"].mean())
-print("Max of sepal length:", iris["sepal_length"].max())
-print("Min of sepal length:", iris["sepal_length"].min())
-print("Quartiles of sepal length", iris["sepal_length"].quantile([0.25, 0.5, 0.75]))
-print("\n")
-
-# Sepal width
-print("Sepal width stats:")
-print("Mean of sepal width: ", iris["sepal_width"].mean())
-print("Max of sepal width:", iris["sepal_width"].max())
-print("Min of sepal width:", iris["sepal_width"].min())
-print("Quartiles of sepal width", iris["sepal_width"].quantile([0.25, 0.5, 0.75]))
-print("\n")
-
-# Pedal length
-print("Pedal length stats:")
-print("Mean of pedal length: ", iris["pedal_length"].mean())
-print("Max of pedal length:", iris["pedal_length"].max())
-print("Min of pedal length:", iris["pedal_length"].min())
-print("Quartiles of pedal length", iris["pedal_length"].quantile([0.25, 0.5, 0.75]))
-print("\n")
-
-# Pedal width
-print("Pedal width stats:")
-print("Mean of pedal width: ", iris["pedal_width"].mean())
-print("Max of pedal width:", iris["pedal_width"].max())
-print("Min of pedal width:", iris["pedal_width"].min())
-print("Quartiles of pedal width", iris["pedal_width"].quantile([0.25, 0.5, 0.75]))
-print("\n")
-
-print(np.mean(iris["sepal_length"]))
+# for loop to get stats on each column
+for col in iris[["sepal_length"]]:
+    print("Mean of: \n{}\n".format(iris.iloc[:, :4].mean()))
+    print("Max of: \n{}\n".format(iris.iloc[:, :4].max()))
+    print("Min of: \n{}\n".format(iris.iloc[:, :4].min()))
+    print("Quantiles of: \n{}\n".format(iris.iloc[:, :4].quantile([0.25, 0.5, 0.75])))
 
 
 # plotting different classes against each other
@@ -79,7 +49,7 @@ scatter = px.scatter(
     title="Scatter plot of iris data set",
 )
 scatter.write_html(file="scatter_plot.html", include_plotlyjs="cdn")
-# scatter.show()
+scatter.show()
 
 # plot 2 - violin plot
 df = px.data.iris()
@@ -93,7 +63,7 @@ violin = px.violin(
     hover_data=df.columns,
 )
 violin.write_html(file="violin_plot.html", include_plotlyjs="cdn")
-# violin.show()
+violin.show()
 
 # plot 3 - scatter matrix
 df = px.data.iris()
@@ -107,7 +77,7 @@ scatter_matrix = px.scatter_matrix(
 )  # remove underscore
 scatter_matrix.update_traces(diagonal_visible=False)
 scatter_matrix.write_html(file="scatter_matrix.html", include_plotlyjs="cdn")
-# scatter_matrix.show()
+scatter_matrix.show()
 
 # plot 4 - distribution plot
 df = px.data.iris()
@@ -121,13 +91,13 @@ hist = px.histogram(
     title="Distribution plot of iris data set",
 )
 hist.write_html(file="hist_plot.html", include_plotlyjs="cdn")
-# hist.show()
+hist.show()
 
 # plot 5 - boxplot
 df = px.data.iris()
 box = px.box(df, y="sepal_length", color="species", title="Boxplot of iris data set")
 box.write_html(file="box_plot.html", include_plotlyjs="cdn")
-# box.show()
+box.show()
 
 # Machine learning models
 # loading data (starting with fresh set in case of any alterations)
@@ -191,7 +161,7 @@ y_pred_lr = logreg.predict(X_test)
 print("Accuracy of Logistic Regression Classifier: ", metrics.accuracy_score(y_test, y_pred_lr))
 """
 
-# Using a sklearn Pipeline
+# Using a sklearn Pipeline on ML models
 # setting up training and testing data
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.30)
 
