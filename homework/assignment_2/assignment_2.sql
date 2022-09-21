@@ -1,13 +1,21 @@
--- Use baseball database
+# Use baseball database
 USE baseball;
 
--- show all tables in baseball db
-SHOW TABLES;
+#####################################################################
+# Useful shortcuts
+# how all tables in baseball db
+# SHOW TABLES;
 
--- show all columns in a table
-SHOW COLUMNS FROM table_name
+# show all columns in a table
+# SHOW COLUMNS FROM table_name
+#####################################################################
 
--- using temp table to store some data
+
+#####################################################################
+# Temp table 
+# gets total hits, atbats, and year
+#####################################################################
+
 CREATE TEMPORARY TABLE temp_stats
 SELECT 
 	bc.batter, SUM(bc.Hit) AS total_hits, 
@@ -22,9 +30,14 @@ ON
 GROUP BY
 	bc.batter;
 
--- using temp table to get historical batting avg
--- getting error of division by 0..
--- create a case statement where atBat is 0 then 0 else calc
+DROP hist_bat_avg IF EXISTS;
+
+
+#####################################################################
+# Query for historical batting avg
+# Case statement to handle division by 0
+#####################################################################
+
 CREATE TABLE hist_bat_avg
 SELECT ts.batter, ts.total_hits, ts.total_atBat,
 CASE
@@ -38,8 +51,12 @@ GROUP BY
 	ts.batter;
 
 
--- using temp table to get year batting avg
--- query to get all year a batter played
+#####################################################################
+# Create temp table for yearly batting avg
+# gets some stats but also uses a window function to break down
+# the query into years for each player
+#####################################################################
+
 CREATE TEMPORARY TABLE temp_year
 SELECT DISTINCT bc.batter, EXTRACT(YEAR from g.local_date) AS year,
 	SUM(bc.Hit) OVER (PARTITION BY bc.batter, year) AS total_hits,
@@ -49,7 +66,14 @@ FROM
 JOIN batter_counts bc
 ON g.game_id = bc.game_id;
 
--- create actual table with batting avg calc
+-- dropping table if exists
+DROP yearly_bat_avg IF EXISTS;
+
+#####################################################################
+# Query to get yearly batting avg
+# Case statement to handle division by 0 
+#####################################################################
+
 CREATE TABLE yearly_bat_avg
 SELECT *,
 CASE
@@ -60,6 +84,7 @@ END AS yearly_batting_avg
 FROM temp_year;
 
 
+-- getting rolling average of last 5 days for a specific player
 
 
 
