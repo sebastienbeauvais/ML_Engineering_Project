@@ -30,8 +30,11 @@ ON
 GROUP BY
 	bc.batter;
 
-DROP hist_bat_avg IF EXISTS;
+#####################################################################
+# Drop the table if it exists
+#####################################################################
 
+DROP hist_bat_avg IF EXISTS;
 
 #####################################################################
 # Query for historical batting avg
@@ -50,7 +53,6 @@ FROM
 GROUP BY 
 	ts.batter;
 
-
 #####################################################################
 # Create temp table for yearly batting avg
 # gets some stats but also uses a window function to break down
@@ -66,7 +68,10 @@ FROM
 JOIN batter_counts bc
 ON g.game_id = bc.game_id;
 
--- dropping table if exists
+#####################################################################
+# Dropping table if exists
+#####################################################################
+
 DROP yearly_bat_avg IF EXISTS;
 
 #####################################################################
@@ -83,8 +88,11 @@ CASE
 END AS yearly_batting_avg
 FROM temp_year;
 
+#####################################################################
+# Rolling average of game and last 100 days
+#####################################################################
 
--- getting rolling average of last 5 days for a specific player
+
 
 
 
