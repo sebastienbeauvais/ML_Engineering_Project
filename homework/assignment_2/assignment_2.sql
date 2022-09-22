@@ -60,7 +60,7 @@ GROUP BY
 #####################################################################
 
 CREATE TEMPORARY TABLE temp_year
-SELECT DISTINCT bc.batter, EXTRACT(YEAR from g.local_date) AS year,
+SELECT DISTINCT bc.batter, EXTRACT(YEAR FROM g.local_date) AS year,
 	SUM(bc.Hit) OVER (PARTITION BY bc.batter, year) AS total_hits,
 	SUM(bc.atBat) OVER(PARTITION BY bc.batter, year) AS total_atBats
 FROM 
@@ -92,8 +92,38 @@ FROM temp_year;
 # Rolling average of game and last 100 days
 #####################################################################
 
+-- lets get batters and games
+CREATE TEMPORARY TABLE temp_rolling
+SELECT DISTINCT bc.batter, g.game_id, 
+	bc.Hit, bc.atBat, 
+CASE
+	WHEN bc.atBat = 0
+	THEN 0
+	ELSE (bc.Hit/bc.atBat)
+END AS batting_avg,
+	DATE(g.local_date) AS date
+FROM 
+	batter_counts bc
+JOIN 
+	game g
+ON 
+	g.game_id = bc.game_id
+JOIN 
+	battersInGame big
+ON 
+	big.batter = bc.batter
+ORDER BY 
+	bc.batter, date
+;
+drop table temp_rolling;
 
+select distinct batter from batter_counts limit 0,20;
 
+-- using window function to get 10 day rolling
+SELECT *,
+	AVG(batting_avg) OVER (ORDER BY date ROWS BETWEEN 
+	100 PRECEDING AND CURRENT ROW) AS rolling_average
+FROM temp_rolling;
 
 
 
