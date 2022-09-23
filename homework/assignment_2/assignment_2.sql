@@ -16,6 +16,38 @@ USE baseball;
 # gets total hits, atbats, and year
 #####################################################################
 
+#####################################################################
+# Dropping all tables and indecies created tables
+# if they exists for clean run
+#####################################################################
+DROP TABLE IF EXISTS temp_stats;
+DROP TABLE IF EXISTS hist_bat_avg;
+DROP TABLE IF EXISTS temp_year;
+DROP TABLE IF EXISTS yearly_bat_avg;
+DROP TABLE IF EXISTS temp_rolling;
+DROP TABLE IF EXISTS temp_game_stats;
+DROP TABLE IF EXISTS temp_game_stats_and_batting_avg;
+
+ALTER TABLE batter_counts
+DROP INDEX batter_stats_idx;
+
+ALTER TABLE game
+DROP INDEX games_idx;
+
+ALTER TABLE battersInGame
+DROP INDEX batter_in_game_idx;
+
+# create an index on batter for quicker results
+CREATE INDEX batter_stats_idx
+ON batter_counts(batter, Hit, atBat, game_id);
+
+CREATE INDEX games_idx
+ON game(game_id);
+
+CREATE INDEX batter_in_game_idx
+ON battersInGame(batter, game_id);
+
+
 CREATE TEMPORARY TABLE temp_stats
 SELECT 
 	bc.batter, SUM(bc.Hit) AS total_hits, 
@@ -34,7 +66,7 @@ GROUP BY
 # Drop the table if it exists
 #####################################################################
 
-DROP hist_bat_avg IF EXISTS;
+--DROP TABLE IF EXISTS hist_bat_avg;
 
 #####################################################################
 # Query for historical batting avg
@@ -72,7 +104,7 @@ ON g.game_id = bc.game_id;
 # Dropping table if exists
 #####################################################################
 
-DROP yearly_bat_avg IF EXISTS;
+--DROP TABLE IF EXISTS yearly_bat_avg;
 
 #####################################################################
 # Query to get yearly batting avg
@@ -92,7 +124,11 @@ FROM temp_year;
 # Rolling average of game and last 100 days
 #####################################################################
 
--- lets get batters and games
+--DROP TABLE IF EXISTS temp_rolling;
+
+-- w index on battercurrently takes 34mins to run
+-- 38 mins w/o index..
+-- 2 seconds with 3 level index..
 CREATE TEMPORARY TABLE temp_rolling
 SELECT DISTINCT bc.batter, g.game_id, 
 	bc.Hit, bc.atBat, 
@@ -115,15 +151,56 @@ ON
 ORDER BY 
 	bc.batter, date
 ;
-drop table temp_rolling;
 
-select distinct batter from batter_counts limit 0,20;
 
--- using window function to get 10 day rolling
+
+--select distinct batter from batter_counts limit 0,20;
+
+-- using window function to get 10 day rolling for each player
 SELECT *,
-	AVG(batting_avg) OVER (ORDER BY date ROWS BETWEEN 
-	100 PRECEDING AND CURRENT ROW) AS rolling_average
+	AVG(batting_avg) OVER (PARTITION BY batter ORDER BY date ROWS BETWEEN 
+	10 PRECEDING AND CURRENT ROW) AS rolling_average
+FROM temp_rolling
+WHERE batter = 110029
+LIMIT 0,20;
+
+SELECT *,
+	AVG(batting_avg) OVER (PARTITION BY batter ORDER BY date ROWS BETWEEN 
+	10 PRECEDING AND 1 PRECEDING) AS rolling_average
+FROM temp_rolling
+WHERE batter = 110029
+LIMIT 0,20;
+
+-- rolling avg over 100 days per player excluding day 1
+SELECT *,
+	AVG(batting_avg) OVER (PARTITION BY batter ORDER BY date ROWS BETWEEN
+	100 PRECEDING AND 1 PRECEDING) AS rolling_average
 FROM temp_rolling;
+--WHERE batter = 407886
+--LIMIT 0,20;
+
+#####################################################################
+# test queries for rolling
+#####################################################################
+--DROP TABLE IF EXISTS temp_game_stats;
+--DROP TABLE IF EXISTS temp_game_stats_and_batting_avg;
+
+CREATE TEMPORARY TABLE temp_game_stats
+SELECT game_id, date,
+	SUM(Hit) AS tot_hits, SUM(atBat) AS tot_bats
+FROM temp_rolling
+GROUP BY game_id;
+
+CREATE TEMPORARY TABLE temp_game_stats_and_batting_avg
+SELECT *, (tot_hits/tot_bats) AS game_bat_avg
+FROM temp_game_stats;
+
+SELECT *,
+	AVG(game_bat_avg) OVER (ORDER BY date ROWS BETWEEN
+	100 PRECEDING AND 1 PRECEDING) AS total_rolling_avg
+FROM temp_game_stats_and_batting_avg
+LIMIT 0,20;	
+
 
 
 
