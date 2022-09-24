@@ -1,5 +1,5 @@
 #####################################################################
-# select database
+# Select database
 #####################################################################
 USE baseball;
 
@@ -11,8 +11,6 @@ DROP TABLE IF EXISTS hist_bat_avg;
 DROP TABLE IF EXISTS temp_year;
 DROP TABLE IF EXISTS yearly_bat_avg;
 DROP TABLE IF EXISTS temp_rolling;
-DROP TABLE IF EXISTS temp_game_stats;
-DROP TABLE IF EXISTS temp_game_stats_and_batting_avg;
 DROP TABLE IF EXISTS overall_rolling_avg;
 
 #####################################################################
@@ -24,17 +22,13 @@ ON batter_counts(batter, Hit, atBat, game_id);
 CREATE INDEX games_idx
 ON game(game_id);
 
-CREATE INDEX batter_in_game_idx
-ON battersInGame(batter, game_id);
-
 #####################################################################
 # Historical Batting Average
 #####################################################################
 CREATE TEMPORARY TABLE temp_stats
 SELECT 
 	bc.batter, SUM(bc.Hit) AS total_hits, 
-	SUM(bc.atBat) AS total_atBat,
-	EXTRACT(YEAR from g.local_date) AS year
+	SUM(bc.atBat) AS total_atBat
 FROM 
 	batter_counts bc
 JOIN 
@@ -44,8 +38,8 @@ ON
 GROUP BY
 	bc.batter;
 
-CREATE TABLE hist_bat_avg
-SELECT ts.batter, ts.total_hits, ts.total_atBat,
+CREATE TABLE hist_bat_avg (batter INT, total_hits INT, hist_batting_avg FLOAT(4,3)) ENGINE=MyISAM
+SELECT *, 
 CASE
 	WHEN ts.total_atBat = 0
 	THEN 0
@@ -68,7 +62,7 @@ FROM
 JOIN batter_counts bc
 ON g.game_id = bc.game_id;
 
-CREATE TABLE yearly_bat_avg
+CREATE TABLE yearly_bat_avg (year YEAR, total_hits INT, total_atBats INT, yearly_batting_avg FLOAT(4,3)) ENGINE=MyISAM
 SELECT *,
 CASE
 	WHEN total_atBats = 0
@@ -81,43 +75,27 @@ FROM temp_year;
 # Rolling average of game and last 100 days
 #####################################################################
 CREATE TEMPORARY TABLE temp_rolling
-SELECT DISTINCT bc.batter, g.game_id, 
-	bc.Hit, bc.atBat, 
-CASE
-	WHEN bc.atBat = 0
-	THEN 0
-	ELSE (bc.Hit/bc.atBat)
-END AS batting_avg,
-	DATE(g.local_date) AS date
+SELECT g.game_id, 
+	SUM(bc.Hit) AS total_hits, SUM(bc.atBat) AS total_atBats, 
+	(SUM(bc.Hit)/SUM(bc.atBat)) AS overall_batting_avg,
+	DATE(g.local_date) AS ora_date
 FROM 
 	batter_counts bc
 JOIN 
 	game g
 ON 
 	g.game_id = bc.game_id
-JOIN 
-	battersInGame big
-ON 
-	big.batter = bc.batter
+GROUP BY
+	g.game_id
 ORDER BY 
-	bc.batter, date
+	g.game_id DESC
 ;
 
-CREATE TEMPORARY TABLE temp_game_stats
-SELECT game_id, date,
-	SUM(Hit) AS tot_hits, SUM(atBat) AS tot_bats
-FROM temp_rolling
-GROUP BY game_id;
-
-CREATE TEMPORARY TABLE temp_game_stats_and_batting_avg
-SELECT *, (tot_hits/tot_bats) AS game_bat_avg
-FROM temp_game_stats;
-
-CREATE TABLE overall_rolling_avg
+CREATE TABLE overall_rolling_avg 
 SELECT *,
-	AVG(game_bat_avg) OVER (ORDER BY date ROWS BETWEEN
-	100 PRECEDING AND 1 PRECEDING) AS total_rolling_avg
-FROM temp_game_stats_and_batting_avg
+	AVG(overall_batting_avg) OVER (ORDER BY game_id, ora_date ROWS BETWEEN
+	100 PRECEDING AND 1 PRECEDING) AS rolling_avg
+FROM temp_rolling
 ;	
 
 #####################################################################
@@ -143,26 +121,6 @@ DROP INDEX batter_stats_idx;
 
 ALTER TABLE game
 DROP INDEX games_idx;
-
-ALTER TABLE battersInGame
-DROP INDEX batter_in_game_idx;
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
