@@ -7,7 +7,16 @@ def main():
     # create spark session
     spark = SparkSession.builder.appName(appName).master(master).getOrCreate()
 
-    sql = "select * from batter_counts"
+    sql = """SELECT bc.game_id,
+        SUM(bc.Hit) AS total_hits,
+        SUM(bc.atBat) AS total_atBats,
+        SUM(bc.Hit)/SUM(bc.atBat) AS batting_avg,
+        DATE(g.local_date) AS ora_date
+        FROM batter_counts bc
+        JOIN game g
+        ON g.game_id = bc.game_id
+        GROUP BY g.game_id
+        ORDER BY g.game_id DESC"""
     database = "baseball"
     user = "root"
     password = ""  # your password
@@ -27,7 +36,7 @@ def main():
         .load()
     )
 
-    df.show()
+    df.show(10)
 
 
 if __name__ == "__main__":
