@@ -5,24 +5,30 @@ from pyspark.sql import SparkSession
 
 
 def main():
-
     appName = "PySpark Connection"
     master = "local"
 
     # create spark session
     spark = SparkSession.builder.appName(appName).master(master).getOrCreate()
 
-    sql = """SELECT bc.game_id,
-        SUM(bc.Hit) AS total_hits,
-        SUM(bc.atBat) AS total_atBats,
-        SUM(bc.Hit)/SUM(bc.atBat) AS batting_avg,
-        DATE(g.local_date) AS ora_date,
-        AVG(SUM(bc.Hit)/SUM(bc.atBat)) OVER (ORDER BY g.game_id, DATE(g.local_date)
+    # SQL query for 100 day rolling avg
+    sql = """
+        SELECT
+            bc.game_id,
+            SUM(bc.Hit) AS total_hits,
+            SUM(bc.atBat) AS total_atBats,
+            SUM(bc.Hit)/SUM(bc.atBat) AS batting_avg,
+            DATE(g.local_date) AS ora_date,
+            AVG(SUM(bc.Hit)/SUM(bc.atBat)) OVER (ORDER BY g.game_id, DATE(g.local_date)
             ROWS BETWEEN 100 PRECEDING AND 1 PRECEDING) AS rolling_avg
-        FROM batter_counts bc
-        JOIN game g
-        ON g.game_id = bc.game_id
-        GROUP BY g.game_id"""
+        FROM
+            batter_counts bc
+        JOIN
+            game g
+        ON
+            g.game_id = bc.game_id
+        GROUP BY
+            g.game_id"""
     database = "baseball"
     user = "root"
     # pragma: allowlist nextline secret
@@ -43,7 +49,7 @@ def main():
         .option("driver", jdbc_driver)
         .load()
     )
-
+    # checking fist 15 entries
     df.show(15)
 
 
