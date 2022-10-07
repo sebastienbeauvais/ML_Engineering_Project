@@ -1,6 +1,7 @@
 # libraries
 import sys
 
+from pyspark import StorageLevel
 from pyspark.sql import SparkSession
 
 
@@ -12,13 +13,13 @@ def main():
     spark = SparkSession.builder.appName(appName).master(master).getOrCreate()
 
     # SQL query for 100 day rolling avg
-    sql = """
+    base_sql = """
         SELECT
             bc.game_id,
-            SUM(bc.Hit) AS total_hits,
-            SUM(bc.atBat) AS total_atBats,
-            SUM(bc.Hit)/SUM(bc.atBat) AS batting_avg,
-            DATE(g.local_date) AS ora_date,
+            SUM(bc.Hit) AS game_total_hits,
+            SUM(bc.atBat) AS game_total_atBats,
+            SUM(bc.Hit)/SUM(bc.atBat) AS game_batting_avg,
+            DATE(g.local_date) AS game_date,
             AVG(SUM(bc.Hit)/SUM(bc.atBat)) OVER (ORDER BY g.game_id, DATE(g.local_date)
             ROWS BETWEEN 100 PRECEDING AND 1 PRECEDING) AS rolling_avg
         FROM
@@ -42,15 +43,54 @@ def main():
     df = (
         spark.read.format("jdbc")
         .option("url", jdbc_url)
-        .option("query", sql)
+        .option("query", base_sql)
         .option("user", user)
         # pragma: allowlist nextline secret
         .option("password", password)
         .option("driver", jdbc_driver)
         .load()
     )
+    # writing query as CSV to use in transformer
+    # if this already exists, it will throw an error...
+    df.write.csv("./baseball_rolling_avg.csv")
+
+    baseball_df = spark.read.csv(
+        "baseball_rolling_avg.csv", inferSchema="true", header="true"
+    )
+    baseball_df.createOrReplaceTempView("baseball")
+    baseball_df.persist(StorageLevel.MEMORY_ONLY)
+
+    # Create a column that has all the words we wnt to encode for modeling
+    # this is where CODE IS BROKEN
+    baseball_df = spark.sql(
+        """
+        SELECT *,
+            SPLIT(CONCAT(
+                CASE WHEN game_id IS NULL THEN ""
+                ELSE game_id END,
+                " ",
+                CASE WHEN game_total_hits IS NULL THEN ""
+                ELSE game_total_hits END,
+                " ",
+                CASE WHEN game_total_atBats IS NULL THEN ""
+                ELSE game_total_atBats END,
+                " ",
+                CASE WHEN game_batting_avg IS NULL THEN ""
+                ELSE game_batting_avg END,
+                " ",
+                CASE WHEN game_date IS NULL THEN ""
+                ELSE game_date END,
+                " ",
+                CASE WHEN rolling_avg IS NULL THEN ""
+                ELSE rolling_avg END
+            ), " ") AS categorical
+        FROM baseball
+        """
+    )
     # checking fist 15 entries
     df.show(15)
+
+    baseball_df.show(15)
 
 
 if __name__ == "__main__":
