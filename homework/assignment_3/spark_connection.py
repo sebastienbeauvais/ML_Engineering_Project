@@ -51,16 +51,15 @@ def main():
         .load()
     )
     # writing query as CSV to use in transformer
-    # if this already exists, it will throw an error...
-    df.write.csv("./baseball_rolling_avg.csv")
+    df.write.options(header="true").csv("rolling_baseball.csv")
 
     baseball_df = spark.read.csv(
-        "baseball_rolling_avg.csv", inferSchema="true", header="true"
+        "rolling_baseball.csv", inferSchema="true", header="true"
     )
-    baseball_df.createOrReplaceTempView("baseball")
+    baseball_df.createOrReplaceTempView("rolling_baseball")
     baseball_df.persist(StorageLevel.MEMORY_ONLY)
 
-    # Create a column that has all the words we wnt to encode for modeling
+    # Create a column that has all the words we want to encode for modeling
     # this is where CODE IS BROKEN
     baseball_df = spark.sql(
         """
@@ -84,7 +83,7 @@ def main():
                 CASE WHEN rolling_avg IS NULL THEN ""
                 ELSE rolling_avg END
             ), " ") AS categorical
-        FROM baseball
+        FROM rolling_baseball
         """
     )
     # checking fist 15 entries
