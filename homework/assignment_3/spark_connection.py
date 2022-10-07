@@ -1,4 +1,5 @@
 # libraries
+import shutil
 import sys
 
 from pyspark import StorageLevel
@@ -60,7 +61,6 @@ def main():
     baseball_df.persist(StorageLevel.MEMORY_ONLY)
 
     # Create a column that has all the words we want to encode for modeling
-    # this is where CODE IS BROKEN
     baseball_df = spark.sql(
         """
         SELECT *,
@@ -90,6 +90,9 @@ def main():
     df.show(15)
 
     baseball_df.show(15)
+
+    # removing csv created from dataframe to run w/o errors
+    shutil.rmtree("rolling_baseball.csv")
 
 
 if __name__ == "__main__":
