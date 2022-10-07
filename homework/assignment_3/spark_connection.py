@@ -1,12 +1,14 @@
 # libraries
-import shutil
 import sys
-
-from pyspark import StorageLevel
-from pyspark.sql import SparkSession
 
 
 def main():
+    # libraries
+    import shutil
+
+    from pyspark import StorageLevel
+    from pyspark.sql import SparkSession
+
     appName = "PySpark Connection"
     master = "local"
 
