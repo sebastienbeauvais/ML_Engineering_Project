@@ -95,6 +95,7 @@ def main():
 
     baseball_df.show(15)
 
+    # checking metadata for dataframe after transformer
     for field in df.schema.fields:
         print(field.name + " , " + str(field.dataType))
 
