@@ -84,7 +84,9 @@ def main():
                 " ",
                 CASE WHEN rolling_avg IS NULL THEN ""
                 ELSE rolling_avg END
-            ), " ") AS categorical
+            ), " ") AS categorical,
+            AVG(game_total_hits/game_total_atBats) OVER (ORDER BY game_id, DATE(game_date)
+            ROWS BETWEEN 100 PRECEDING AND 1 PRECEDING) AS avg_transform
         FROM rolling_baseball
         """
     )
@@ -92,6 +94,9 @@ def main():
     df.show(15)
 
     baseball_df.show(15)
+
+    for field in df.schema.fields:
+        print(field.name + " , " + str(field.dataType))
 
     # removing csv created from dataframe to run w/o errors
     shutil.rmtree("rolling_baseball.csv")
