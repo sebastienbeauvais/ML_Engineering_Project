@@ -4,7 +4,15 @@ import pandas as pd
 import statsmodels.api as sm
 
 # from plotly import express as px
-from sklearn import datasets
+# from sklearn import datasets
+
+
+# function to printing  headings
+def print_heading(title):
+    print("*" * 80)
+    print(title)
+    print("*" * 80)
+    return
 
 
 # function to load any sklearn dataset in as pandas dataframe
@@ -14,29 +22,73 @@ def sklearn_to_df(sklearn_dataset):
     return df
 
 
+# first pass testing on titanic
 def main():
     # diabetes = datasets.load_diabetes()
-    df_diabetes = sklearn_to_df(datasets.load_diabetes())
-    print(df_diabetes.head())
+    df_titanic = pd.read_csv("./datasets/titanic.csv")
+    # df_diabetes = sklearn_to_df(datasets.load_titanic())
+    print(df_titanic.head())
 
+    # this split is for most datasets where last column is target
+    """
     # splitting features and target
     X = df_diabetes.iloc[:, :-1]  # all but last column
     y = df_diabetes.iloc[:, -1]  # last column
     # X = diabetes.data
     # y = diabetes.target
+    """
 
-    # categorizing each variable
-    for (columnName, columnData) in df_diabetes.iteritems():
+    # split for titanic
+    column_to_move = df_titanic.pop("Survived")  # remove survived - dependent variable
+    df_titanic[
+        "Survived"
+    ] = column_to_move  # add survived (DV) to end of df to split easier
+
+    # removing useless columns
+    df_titanic.pop("Ticket")
+    df_titanic.pop("Cabin")
+    df_titanic.pop("PassengerId")
+    df_titanic.pop("Name")
+
+    X = df_titanic.iloc[:, :-1]
+    y = df_titanic.iloc[:, -1]
+
+    # splitting predictors into categorical/continuous
+    # print(X.dtypes)
+    # catg = X.select_dtypes("object")
+    # cont = X.select_dtypes("number")
+
+    # categorizing each independent (predictor) variable
+    print_heading("Predictors")
+    catg = pd.DataFrame()
+    cont = pd.DataFrame()
+    for (columnName, columnData) in X.iteritems():
         print("Column Name : ", columnName)
         print("Unique Values : ", columnData.nunique())
-        if columnData.nunique() > 4:
-            print("Continuous\n")
-        else:
+        if columnData.nunique() <= 3:
+            catg[columnName] = columnData
             print("Boolean\n")
+        elif columnData.dtype == "object" and columnData.nunique() <= 3:
+            catg[columnName] = columnData
+            print("Boolean\n")
+        else:
+            cont[columnName] = columnData
+            print("Continuous\n")
+
+    print(catg.head())
+    print(cont.head())
+
+    # categorizing dependent variable
+    print_heading("Dependent Variable")
+    print("Column Name : ", y.name)
+    print("Unique Values : ", y.nunique())
+    if y.nunique() > 2:  # we just need to check for 2 but in this example we have 3
+        print("Continuous")
+    else:
+        print("Boolean")
 
     # this works for a single predictor
     feature_name = list(X.columns)
-    print(feature_name)  # inlcudes target. must remove
     predictor = sm.add_constant(X.iloc[:, 0])
     linear_regression_model = sm.OLS(y, predictor)
     linear_regression_model_fitted = linear_regression_model.fit()
