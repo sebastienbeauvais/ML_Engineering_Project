@@ -2,8 +2,7 @@
 import sys
 
 import pandas as pd
-
-# import statsmodels.api as sm
+import statsmodels.api as sm
 
 
 # function to printing  headings
@@ -24,7 +23,7 @@ def sklearn_to_df(sklearn_dataset):
 # first pass testing on titanic
 def main():
     df_titanic = pd.read_csv("./datasets/titanic.csv")
-    print(df_titanic.head())
+    df_titanic = df_titanic.dropna()
 
     # split for titanic
     column_to_move = df_titanic.pop("Survived")  # remove survived - dependent variable
@@ -72,12 +71,18 @@ def main():
         print("Boolean")
 
     # get list of column headers to iterate over
-    column_headers = list(X.columns)
+    cont_column_headers = list(cont.columns)
+    print(cont_column_headers)
 
-    for index, col in enumerate(X.T):
-        feature_name = column_headers[index]
-        print(feature_name)
-        # predictor = sm.add_constant(X.iloc[:, col])
+    for index, col in enumerate(cont.T):
+        print(index)
+        feature_name = cont_column_headers[index]
+        predictor = sm.add_constant(cont.iloc[:, col])
+        print(col)
+        lm = sm.OLS(y, predictor)
+        lm_fitted = lm.fit()
+        print(f"Variable: {feature_name}")
+        print(lm_fitted.summary())
 
 
 if __name__ == "__main__":
