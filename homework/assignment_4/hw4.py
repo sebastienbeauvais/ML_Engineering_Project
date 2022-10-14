@@ -74,18 +74,38 @@ def main():
         print("Boolean")
 
     # Linear model for continuous features
-    cols = len(
-        cont.columns
-    )  # gets how ever many continous variables we have in out model
-    titanic_features = list(cont.columns)
-    predictor = sm.add_constant(cont.iloc[:, 0:cols])
-    lm = sm.OLS(y, predictor)
-    lm_fitted = lm.fit()
-    print(f"Variable: {titanic_features}")
-    print(lm_fitted.summary())
+    headers = list(cont.columns)
+
+    print(headers)
+    print("columns: ", cont.columns[0])
+    for key in cont:
+        titanic_features = key
+        col = cont[key]
+        predictor = sm.add_constant(col)
+        lm = sm.OLS(y, predictor)
+        lm_fitted = lm.fit()
+        print(f"Variable: {titanic_features}")
+        print(lm_fitted.summary())
+
+        # Get the stats
+        t_value = round(lm_fitted.tvalues[1], 6)
+        p_value = "{:.6e}".format(lm_fitted.pvalues[1])
+
+        # Plot the figure
+        fig = px.scatter(x=col, y=y, trendline="ols")
+        fig.update_layout(
+            title=f"Variable: {titanic_features}: (t-value={t_value}) (p-value={p_value})",
+            xaxis_title=f"Variable: {titanic_features}",
+            yaxis_title="y",
+        )
+        fig.show()
+
+    # getting p and t values
+    # t_value = round(lm_fitted.tvalues[1], 6)
+    # p_value = "{:.6e}".format(lm_fitted.pvalues[1])
 
     # checking relationship between variables
-    print(df_titanic.corr())
+    print(X.corr())
 
     # converts object types to dummies
     """for key in X:
@@ -96,7 +116,7 @@ def main():
     # plotting each predictor against dependent
     for key in X:
         fig = px.density_heatmap(df_titanic, x=key, y=y, height=500, width=500)
-        fig.show()
+        # fig.show()
 
 
 if __name__ == "__main__":
