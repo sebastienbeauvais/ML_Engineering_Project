@@ -3,6 +3,8 @@ import sys
 
 import pandas as pd
 import plotly.express as px
+
+# import plotly.graph_objects as go
 import statsmodels.api as sm
 
 
@@ -84,8 +86,17 @@ def main():
 
     # checking relationship between variables
     print(df_titanic.corr())
-    heat_map = px.imshow(df_titanic)
-    heat_map.show()
+
+    # converts object types to dummies
+    """for key in X:
+        print("key: ", key)
+        if X[key].dtype == 'object':
+            X = pd.get_dummies(X, columns=[key])"""
+
+    # plotting each predictor against dependent
+    for key in X:
+        fig = px.density_heatmap(df_titanic, x=key, y=y, height=500, width=500)
+        fig.show()
 
 
 if __name__ == "__main__":
