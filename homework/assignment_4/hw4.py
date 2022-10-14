@@ -2,10 +2,11 @@
 import sys
 
 import pandas as pd
+import plotly.express as px
 import statsmodels.api as sm
 
 
-# function to printing  headings
+# function to for printing headings
 def print_heading(title):
     print("*" * 80)
     print(title)
@@ -70,19 +71,21 @@ def main():
     else:
         print("Boolean")
 
-    # get list of column headers to iterate over
-    cont_column_headers = list(cont.columns)
-    print(cont_column_headers)
+    # Linear model for continuous features
+    cols = len(
+        cont.columns
+    )  # gets how ever many continous variables we have in out model
+    titanic_features = list(cont.columns)
+    predictor = sm.add_constant(cont.iloc[:, 0:cols])
+    lm = sm.OLS(y, predictor)
+    lm_fitted = lm.fit()
+    print(f"Variable: {titanic_features}")
+    print(lm_fitted.summary())
 
-    for index, col in enumerate(cont.T):
-        print(index)
-        feature_name = cont_column_headers[index]
-        predictor = sm.add_constant(cont.iloc[:, col])
-        print(col)
-        lm = sm.OLS(y, predictor)
-        lm_fitted = lm.fit()
-        print(f"Variable: {feature_name}")
-        print(lm_fitted.summary())
+    # checking relationship between variables
+    print(df_titanic.corr())
+    heat_map = px.imshow(df_titanic)
+    heat_map.show()
 
 
 if __name__ == "__main__":
