@@ -5,13 +5,10 @@ from io import StringIO
 import pandas as pd
 import plotly.express as px
 import pydot
-
-# import plotly.graph_objects as go
 import statsmodels.api as sm
-
-# from pandas import DataFrame
-# from plotly import graph_objects as go
-# from sklearn.model_selection import GridSearchCV
+from pandas import DataFrame
+from plotly import graph_objects as go
+from sklearn.model_selection import GridSearchCV
 from sklearn.tree import DecisionTreeClassifier, export_graphviz
 
 
@@ -119,7 +116,7 @@ def main():
             xaxis_title=f"y: {y.name}",
             yaxis_title=f"Variable: {titanic_features}",
         )
-        # fig.show()
+        fig.show()
 
     # checking relationship between variables
     print(X.corr())
@@ -127,7 +124,7 @@ def main():
     # plotting each predictor against dependent
     for key in X:
         fig = px.density_heatmap(df_titanic, x=key, y=y, height=500, width=500)
-        # fig.show()
+        fig.show()
 
     # converts object types to dummies for random forest classifier
     dummies_df = pd.get_dummies(X)
@@ -153,6 +150,66 @@ def main():
         class_names="classification",
         file_out="titanic_tree_full",
     )
+
+    # Find an optimal tree via cross-validation
+    parameters = {
+        "max_depth": range(1, max_tree_depth),
+        "criterion": ["gini", "entropy"],
+    }
+    decision_tree_grid_search = GridSearchCV(
+        DecisionTreeClassifier(random_state=tree_random_state), parameters, n_jobs=4
+    )
+    decision_tree_grid_search.fit(X=dummies_X, y=dummies_y)
+
+    cv_results = DataFrame(decision_tree_grid_search.cv_results_["params"])
+    cv_results["score"] = decision_tree_grid_search.cv_results_["mean_test_score"]
+    print_heading("Cross validation results")
+    print(cv_results)
+    print_heading("Cross validation results - HTML table")
+    print(cv_results.to_html())
+
+    # Plot these cross_val results
+    gini_results = cv_results.loc[cv_results["criterion"] == "gini"]
+    entropy_results = cv_results.loc[cv_results["criterion"] == "entropy"]
+    data = [
+        go.Scatter(
+            x=gini_results["max_depth"].values,
+            y=gini_results["score"].values,
+            name="gini",
+            mode="lines",
+        ),
+        go.Scatter(
+            x=entropy_results["max_depth"].values,
+            y=entropy_results["score"].values,
+            name="entropy",
+            mode="lines",
+        ),
+    ]
+
+    layout = go.Layout(
+        title="Dataset Cross Validation",
+        xaxis_title="Tree Depth",
+        yaxis_title="Score",
+    )
+
+    fig = go.Figure(data=data, layout=layout)
+    fig.show()
+    fig.write_html(
+        file="titanic_cross_val.html",
+        include_plotlyjs="cdn",
+    )
+
+    # Get the "best" model
+    best_tree_model = decision_tree_grid_search.best_estimator_
+
+    # Plot this "best" decision tree
+    plot_decision_tree(
+        decision_tree=best_tree_model,
+        feature_names=cont_features,
+        class_names="classification",
+        file_out="titanic_tree_cross_val",
+    )
+    return
 
 
 if __name__ == "__main__":
