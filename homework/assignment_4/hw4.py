@@ -1,4 +1,5 @@
 # libraries
+import os
 import sys
 from io import StringIO
 
@@ -27,6 +28,15 @@ def sklearn_to_df(sklearn_dataset):
     return df
 
 
+# function to convert plot to link
+def plot_to_link(path):
+    # returns the final component of a url
+    f_url = os.path.basename(path)
+
+    # convert the url into link
+    return '<a href="{}">{}</a>'.format(path, f_url)
+
+
 def plot_decision_tree(decision_tree, feature_names, class_names, file_out):
     with StringIO() as dot_data:
         export_graphviz(
@@ -52,6 +62,19 @@ def main():
 
     # initiLizing out final output table
     output_table = pd.DataFrame(
+        columns=[
+            "Response",
+            "Predictor",
+            "Plot",
+            "t_score",
+            "p_value",
+            "RF_VarImp",
+            "MWR_Unweighted",
+            "MWR_Weighted",
+        ]
+    )
+    # making a second output table to join cat variables
+    output_table_2 = pd.DataFrame(
         columns=[
             "Response",
             "Predictor",
@@ -130,16 +153,6 @@ def main():
         t_value = round(lm_fitted.tvalues[1], 6)
         p_value = "{:.6e}".format(lm_fitted.pvalues[1])
 
-        # writing to our output table
-        temp_row = {
-            "Response": y.name,
-            "Predictor": key,
-            "Plot": "Link to plot",
-            "t_score": t_value,
-            "p_value": p_value,
-        }
-        output_table = output_table.append(temp_row, ignore_index=True)
-
         # Plot the figure
         cont_scatter = px.scatter(x=y, y=col, trendline="ols")
         cont_scatter.update_layout(
@@ -149,6 +162,16 @@ def main():
         )
         cont_scatter.show()
 
+        # writing to our output table
+        temp_row = {
+            "Response": y.name,
+            "Predictor": key,
+            "Plot": cont_scatter,
+            "t_score": t_value,
+            "p_value": p_value,
+        }
+        output_table = output_table.append(temp_row, ignore_index=True)
+
     # checking relationship between variables
     print(df_titanic.corr())
 
@@ -156,10 +179,18 @@ def main():
     # heatmap
     ################################################
     for key in X:
+        print(key)
         titanic_heatmap = px.density_heatmap(
             df_titanic, x=key, y=y, height=500, width=500
         )
         titanic_heatmap.show()
+        # writing to our output table
+        temp_row = {
+            "Response": y.name,
+            "Predictor": key,
+            "Plot": titanic_heatmap,
+        }
+        output_table_2 = output_table_2.append(temp_row, ignore_index=True)
 
     ################################################
     # dummies
@@ -254,8 +285,17 @@ def main():
     # looking at feature importance
     feat_importance = decision_tree.tree_.compute_feature_importances(normalize=False)
 
-    print(output_table)
-    print(feat_importance)
+    output_table_2.update(output_table)
+    output_table_2 = pd.DataFrame(output_table_2)
+    feature_df = pd.DataFrame(feat_importance)
+    output_table_2 = pd.concat([output_table_2, feature_df], axis=1)
+    output_table_2["RF_VarImp"] = output_table_2.iloc[:, -1:]
+    output_table_2 = output_table_2.iloc[:, :-1]
+    output_table_2 = output_table_2[output_table_2["Response"].notna()]
+    print(output_table_2)
+
+    # converting output table to csv
+    output_table_2.to_csv("output.csv")
 
     return
 
