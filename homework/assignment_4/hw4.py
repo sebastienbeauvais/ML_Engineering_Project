@@ -41,11 +41,31 @@ def plot_decision_tree(decision_tree, feature_names, class_names, file_out):
         graph[0].write_png(file_out + ".png")  # must access graph's first element
 
 
-# first pass testing on titanic
 def main():
+    # loading dataset from csv
     df_titanic = pd.read_csv("./datasets/titanic.csv")
-    df_titanic = df_titanic.dropna()
+    # to load a dataset from sklearn use the sklearn_to_df function
 
+    # dropping nulls
+    df_titanic = df_titanic.dropna()
+    print(df_titanic.dtypes)
+
+    # initiLizing out final output table
+    output_table = pd.DataFrame(
+        columns=[
+            "Response",
+            "Predictor",
+            "Plot",
+            "t_score",
+            "p_value",
+            "RF_VarImp",
+            "MWR_Unweighted",
+            "MWR_Weighted",
+        ]
+    )
+
+    #####################################################################
+    # this code is specific for the titanic dataset
     # split for titanic
     column_to_move = df_titanic.pop("Survived")  # remove survived - dependent variable
     df_titanic[
@@ -57,11 +77,12 @@ def main():
     df_titanic.pop("Cabin")
     df_titanic.pop("PassengerId")
     df_titanic.pop("Name")
+    #####################################################################
 
     X = df_titanic.iloc[:, :-1]
     y = df_titanic.iloc[:, -1]
 
-    # categorizing each independent (predictor) variable
+    # categorizing each independent (predictor) variable as categorical or continuous
     print_heading("Predictors")
     catg = pd.DataFrame()
     cont = pd.DataFrame()
@@ -109,22 +130,40 @@ def main():
         t_value = round(lm_fitted.tvalues[1], 6)
         p_value = "{:.6e}".format(lm_fitted.pvalues[1])
 
+        # writing to our output table
+        temp_row = {
+            "Response": y.name,
+            "Predictor": key,
+            "Plot": "Link to plot",
+            "t_score": t_value,
+            "p_value": p_value,
+        }
+        output_table = output_table.append(temp_row, ignore_index=True)
+
         # Plot the figure
-        fig = px.scatter(x=y, y=col, trendline="ols")
-        fig.update_layout(
+        cont_scatter = px.scatter(x=y, y=col, trendline="ols")
+        cont_scatter.update_layout(
             title=f"Variable: {titanic_features}: (t-value={t_value}) (p-value={p_value})",
             xaxis_title=f"y: {y.name}",
             yaxis_title=f"Variable: {titanic_features}",
         )
-        fig.show()
+        cont_scatter.show()
 
     # checking relationship between variables
-    print(X.corr())
+    print(df_titanic.corr())
 
-    # plotting each predictor against dependent
+    ################################################
+    # heatmap
+    ################################################
     for key in X:
-        fig = px.density_heatmap(df_titanic, x=key, y=y, height=500, width=500)
-        fig.show()
+        titanic_heatmap = px.density_heatmap(
+            df_titanic, x=key, y=y, height=500, width=500
+        )
+        titanic_heatmap.show()
+
+    ################################################
+    # dummies
+    ################################################
 
     # converts object types to dummies for random forest classifier
     dummies_df = pd.get_dummies(X)
@@ -135,7 +174,9 @@ def main():
     dummies_X = dummies_df[cont_features].values
     dummies_y = y
 
+    ################################################
     # decision tree classifier
+    ################################################
     max_tree_depth = 7
     tree_random_state = 0  # setting a seed for reproduction
     decision_tree = DecisionTreeClassifier(
@@ -209,6 +250,13 @@ def main():
         class_names="classification",
         file_out="titanic_tree_cross_val",
     )
+    # ranking each variable
+    # looking at feature importance
+    feat_importance = decision_tree.tree_.compute_feature_importances(normalize=False)
+
+    print(output_table)
+    print(feat_importance)
+
     return
 
 
