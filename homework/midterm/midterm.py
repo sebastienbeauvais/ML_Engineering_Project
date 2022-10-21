@@ -4,7 +4,7 @@ import sys
 from typing import List
 
 # import matplotlib.pyplot as plt
-# import numpy as np
+import numpy as np
 import pandas
 import pandas as pd
 
@@ -111,7 +111,7 @@ def get_test_data_set(data_set_name: str = None) -> (pandas.DataFrame, List[str]
 
 def main():
     # loading a test dataset
-    test_data, predictors, response = get_test_data_set(data_set_name="titanic")
+    test_data, predictors, response = get_test_data_set(data_set_name="mpg")
 
     # splitting dataset predictors into categorical and continuous
     df_continuous = test_data.select_dtypes(include="float")
@@ -122,12 +122,11 @@ def main():
     # continuous/continuous Predictor Pairs
     pearson_corr = df_continuous.corr()
     print(pearson_corr)
-    col_1 = pearson_corr.loc[:, "age"][1:]
-    print(col_1["fare"])
+    col_1 = pearson_corr.iloc[:, 0][1:]  # remove age to be first column
+    col_1 = list(col_1[0:])
     abs_pearson = abs(pearson_corr)
-    col_2 = abs_pearson.loc[:, "age"][1:]
-    print(col_2["fare"])
-    print(abs_pearson)
+    col_2 = abs_pearson.iloc[:, 0][1:]
+    col_2 = list(col_2[0:])
 
     # table to populate
     cont_cont_output_table = pd.DataFrame(
@@ -147,20 +146,77 @@ def main():
         for subset in itertools.combinations(pearson_corr, L):
             cols = list(subset)
 
-    # adding variables to cont/cont output table
-    cont_cont_output_table["Predictors"] = cols
-    cont_cont_output_table["Pearson's r"] = col_1["fare"]
-    cont_cont_output_table["Abs Value of Pearson"] = col_2["fare"]
-    print(cont_cont_output_table.head())
+    print(cols)
+    # getting combinations of columns
+    col_combs = ["/".join(map(str, comb)) for comb in itertools.combinations(cols, 2)]
+    print(col_combs)
+
+    # Linear regression for cont/cont
 
     # heatmap plot for cont/cont variables
-    fig = go.Figure(
-        data=go.Heatmap(z=pearson_corr, x=pearson_corr.columns, y=pearson_corr.columns)
+    mask = np.triu(np.ones_like(pearson_corr, dtype=bool))
+    rLT = pearson_corr.mask(mask)
+    abs_rLT = abs(rLT)
+
+    # needed rLT for list of corr values
+    # getting them into a list for output table
+    whole_list = []
+    for row in rLT.values.tolist():
+        partial_list = []
+        for column in row:
+            if pd.notna(column):
+                partial_list.append(column)
+        whole_list.append(partial_list)
+
+    # flattened list of correlation values
+    pearsons_r = [item for sublist in whole_list for item in sublist]
+
+    # doing the same for absolute value of pearson
+    whole_list = []
+    for row in abs_rLT.values.tolist():
+        partial_list = []
+        for column in row:
+            if pd.notna(column):
+                partial_list.append(column)
+        whole_list.append(partial_list)
+
+    # flattened list of correlation values
+    abs_pearson = [item for sublist in whole_list for item in sublist]
+
+    # defining heatmap
+    heat = go.Heatmap(
+        z=rLT,
+        x=rLT.columns.values,
+        y=rLT.columns.values,
+        zmin=-0.25,
+        zmax=1,
+        xgap=1,
+        ygap=1,
     )
+
+    # formatting heatmap
+    title = "Cont/Cont Predictor Correlation Matrix"
+    layout = go.Layout(
+        title_text=title,
+        title_x=0.5,
+        width=600,
+        height=600,
+        xaxis_showgrid=False,
+        yaxis_showgrid=False,
+        yaxis_autorange="reversed",
+    )
+
+    fig = go.Figure(data=[heat], layout=layout)
 
     # writing heatmap to html for linking in table
     fig.write_html(file="cont_cont_corr_matrix.html")
     # fig.show()
+
+    # adding variables to cont/cont output table
+    cont_cont_output_table["Predictors"] = col_combs
+    cont_cont_output_table["Pearson's r"] = pearsons_r
+    cont_cont_output_table["Abs Value of Pearson"] = abs_pearson
+    print(cont_cont_output_table.head())
 
 
 if __name__ == "__main__":
