@@ -7,8 +7,7 @@ from typing import List
 import numpy as np
 import pandas
 import pandas as pd
-
-# import plotly.express as px
+import plotly.express as px
 import plotly.graph_objs as go
 import seaborn
 from sklearn import datasets
@@ -123,10 +122,10 @@ def main():
     pearson_corr = df_continuous.corr()
     print(pearson_corr)
     col_1 = pearson_corr.iloc[:, 0][1:]  # remove age to be first column
-    col_1 = list(col_1[0:])
+    col_1 = list(col_1[0:])  # remove line?
     abs_pearson = abs(pearson_corr)
     col_2 = abs_pearson.iloc[:, 0][1:]
-    col_2 = list(col_2[0:])
+    col_2 = list(col_2[0:])  # remove line?
 
     # table to populate
     cont_cont_output_table = pd.DataFrame(
@@ -150,8 +149,6 @@ def main():
     # getting combinations of columns
     col_combs = ["/".join(map(str, comb)) for comb in itertools.combinations(cols, 2)]
     print(col_combs)
-
-    # Linear regression for cont/cont
 
     # heatmap plot for cont/cont variables
     mask = np.triu(np.ones_like(pearson_corr, dtype=bool))
@@ -216,7 +213,30 @@ def main():
     cont_cont_output_table["Predictors"] = col_combs
     cont_cont_output_table["Pearson's r"] = pearsons_r
     cont_cont_output_table["Abs Value of Pearson"] = abs_pearson
-    print(cont_cont_output_table.head())
+    print(cont_cont_output_table)
+
+    # Linear regression for each cont/cont predictors
+
+    print("number of rows", len(cont_cont_output_table))
+    for column_x in df_continuous:
+        for column_y in df_continuous:
+            if column_x != column_y:
+                fig = px.scatter(df_continuous, x=column_x, y=column_y, trendline="ols")
+                results = px.get_trendline_results(fig)
+                # results = results.iloc[0]["px_fit_results"].summary()
+                t_val = results.iloc[0]["px_fit_results"].tvalues
+                t_val = round(t_val[1], 6)
+                p_val = results.iloc[0]["px_fit_results"].pvalues
+                p_val = p_val[1]
+                fig.update_layout(
+                    title=f"{column_x}/{column_y}: (t-value={t_val} p-value={p_val})",
+                )
+                fig.write_html(f"{column_x}_{column_y}_linear_model.html")
+                # fig.show()
+            else:
+                continue
+
+    # print(cont_cont_output_table)
 
 
 if __name__ == "__main__":
