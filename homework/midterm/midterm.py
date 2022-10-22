@@ -29,6 +29,11 @@ TITANIC_PREDICTORS = [
 ]
 
 
+# make linked cells
+def make_clickable(val):
+    return '<a href="{}">{}</a>'.format(val, val)
+
+
 # dataset loader
 def get_test_data_set(data_set_name: str = None) -> (pandas.DataFrame, List[str], str):
     """Function to load a few test data sets
@@ -120,7 +125,7 @@ def main():
 
     # continuous/continuous Predictor Pairs
     pearson_corr = df_continuous.corr()
-    print(pearson_corr)
+    # print(pearson_corr)
     col_1 = pearson_corr.iloc[:, 0][1:]  # remove age to be first column
     col_1 = list(col_1[0:])  # remove line?
     abs_pearson = abs(pearson_corr)
@@ -145,10 +150,8 @@ def main():
         for subset in itertools.combinations(pearson_corr, L):
             cols = list(subset)
 
-    print(cols)
     # getting combinations of columns
     col_combs = ["/".join(map(str, comb)) for comb in itertools.combinations(cols, 2)]
-    print(col_combs)
 
     # heatmap plot for cont/cont variables
     mask = np.triu(np.ones_like(pearson_corr, dtype=bool))
@@ -213,14 +216,12 @@ def main():
     cont_cont_output_table["Predictors"] = col_combs
     cont_cont_output_table["Pearson's r"] = pearsons_r
     cont_cont_output_table["Abs Value of Pearson"] = abs_pearson
-    print(cont_cont_output_table)
 
     # Linear regression for each cont/cont predictors
-
-    print("number of rows", len(cont_cont_output_table))
+    i = 0
     for column_x in df_continuous:
         for column_y in df_continuous:
-            if column_x != column_y:
+            if column_x != column_y and i <= len(cont_cont_output_table):
                 fig = px.scatter(df_continuous, x=column_x, y=column_y, trendline="ols")
                 results = px.get_trendline_results(fig)
                 # results = results.iloc[0]["px_fit_results"].summary()
@@ -232,11 +233,19 @@ def main():
                     title=f"{column_x}/{column_y}: (t-value={t_val} p-value={p_val})",
                 )
                 fig.write_html(f"{column_x}_{column_y}_linear_model.html")
+                # still  need to add link
+                cont_cont_output_table["Linear Regression Plot"][
+                    i
+                ] = f"{column_x}_{column_y}_linear_model"
                 # fig.show()
-            else:
+                i += 1
+            elif column_x == column_y:
+                i = i
                 continue
+            else:
+                break
 
-    # print(cont_cont_output_table)
+    print(cont_cont_output_table)
 
 
 if __name__ == "__main__":
