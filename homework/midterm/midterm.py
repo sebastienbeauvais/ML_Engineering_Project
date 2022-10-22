@@ -115,13 +115,17 @@ def get_test_data_set(data_set_name: str = None) -> (pandas.DataFrame, List[str]
 
 def main():
     # loading a test dataset
-    test_data, predictors, response = get_test_data_set(data_set_name="mpg")
+    test_data, predictors, response = get_test_data_set(data_set_name="titanic")
 
     # splitting dataset predictors into categorical and continuous
     df_continuous = test_data.select_dtypes(include="float")
     df_categorical = test_data.select_dtypes(exclude="float")
     print(df_continuous.head(5))
     print(df_categorical.head(5))
+
+    #####################################################################
+    # CONT/CONT OUTPUT TABLE
+    #####################################################################
 
     # continuous/continuous Predictor Pairs
     pearson_corr = df_continuous.corr()
@@ -286,6 +290,7 @@ def main():
                     / np.sum(df_continuous[column_y] * (sample_size - 1) / sample_size)
                 )
                 w_mse.append(formula)
+                # added binned plots later
                 i += 1
             elif column_x == column_y:
                 i = i
@@ -298,6 +303,98 @@ def main():
     cont_cont_brute_force["Weighted Difference of Mean Response"] = w_mse
 
     print(cont_cont_brute_force)
+
+    #####################################################################
+    # CONT/CAT OUTPUT TABLE
+    #####################################################################
+    # defining the output table
+    cont_cat_output_table = pd.DataFrame(
+        columns=[
+            "Predictors",
+            "Correlation Ratio",
+            "Absolute Value of Correlation",
+            "Violin Plot",
+            "Distribution Plot",
+        ]
+    )
+
+    # correlation between cont/cat predictors
+    cont_cat_corr = test_data.corr()
+    print(cont_cat_corr)
+
+    # this will hold out column pairs
+    cols = []
+
+    # loop through column names to get combinations
+    for L in range(len(cont_cat_corr) + 1):
+        for subset in itertools.combinations(cont_cat_corr, L):
+            cols = list(subset)
+
+    # getting combinations of columns
+    col_combs = ["/".join(map(str, comb)) for comb in itertools.combinations(cols, 2)]
+
+    # heatmap plot for cont/cat variables
+    mask = np.triu(np.ones_like(cont_cat_corr, dtype=bool))
+    rLT = cont_cat_corr.mask(mask)
+    abs_rLT = abs(rLT)
+
+    # getting them into a list for output table
+    whole_list = []
+    for row in rLT.values.tolist():
+        partial_list = []
+        for column in row:
+            if pd.notna(column):
+                partial_list.append(column)
+        whole_list.append(partial_list)
+
+    # flatten list for correlation values
+    out_corr = [item for sublist in whole_list for item in sublist]
+
+    # same but for abs values as above
+    whole_list = []
+    for row in abs_rLT.values.tolist():
+        partial_list = []
+        for column in row:
+            if pd.notna(column):
+                partial_list.append(column)
+        whole_list.append(partial_list)
+
+    # flatten list for correlation values
+    abs_out_corr = [item for sublist in whole_list for item in sublist]
+
+    # defining heatmap
+    heat = go.Heatmap(
+        z=rLT,
+        x=rLT.columns.values,
+        y=rLT.columns.values,
+        zmin=-0.25,
+        xgap=1,
+        ygap=1,
+    )
+
+    # formatting heatmap
+    title = "Cont/Cat Predictor Correlation Matrix"
+    layout = go.Layout(
+        title_text=title,
+        title_x=0.5,
+        width=600,
+        height=600,
+        xaxis_showgrid=False,
+        yaxis_showgrid=False,
+        yaxis_autorange="reversed",
+    )
+
+    # plotting figure
+    fig = go.Figure(data=[heat], layout=layout)
+    fig.write_html(file="cont_cat_corr_matrix.html")
+    # fig.show()
+
+    # filling columns on output table
+    cont_cat_output_table["Predictors"] = col_combs
+    cont_cat_output_table["Correlation Ratio"] = out_corr
+    cont_cat_output_table["Absolute Value of Correlation"] = abs_out_corr
+
+    print(cont_cat_output_table)
 
 
 if __name__ == "__main__":
