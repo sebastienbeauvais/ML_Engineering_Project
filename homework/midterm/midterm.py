@@ -117,9 +117,12 @@ def main():
     # loading a test dataset
     test_data, predictors, response = get_test_data_set(data_set_name="titanic")
 
+    # get response out of test_data
+    df = test_data.iloc[:, test_data.columns != response]
+
     # splitting dataset predictors into categorical and continuous
-    df_continuous = test_data.select_dtypes(include="float")
-    df_categorical = test_data.select_dtypes(exclude="float")
+    df_continuous = df.select_dtypes(include="float")
+    df_categorical = df.select_dtypes(exclude="float")
     print(df_continuous.head(5))
     print(df_categorical.head(5))
 
@@ -213,7 +216,7 @@ def main():
     fig = go.Figure(data=[heat], layout=layout)
 
     # writing heatmap to html for linking in table
-    fig.write_html(file="cont_cont_corr_matrix.html")
+    fig.write_html(file="plots/corr/cont_cont_corr_matrix.html")
     # fig.show()
 
     # adding variables to cont/cont output table
@@ -236,7 +239,7 @@ def main():
                 fig.update_layout(
                     title=f"{column_x}/{column_y}: (t-value={t_val} p-value={p_val})",
                 )
-                fig.write_html(f"{column_x}_{column_y}_linear_model.html")
+                fig.write_html(f"plots/lm/{column_x}_{column_y}_linear_model.html")
                 # still  need to add link
                 cont_cont_output_table["Linear Regression Plot"][
                     i
@@ -254,7 +257,10 @@ def main():
 
     print(cont_cont_output_table)
 
-    # cont/cont Brute force table
+    #####################################################################
+    # CONT/CONT BRUTE FORCE TABLE
+    #####################################################################
+
     cont_cont_brute_force = pd.DataFrame(
         columns=[
             "Predictors",
@@ -319,8 +325,7 @@ def main():
     )
 
     # correlation between cont/cat predictors
-    cont_cat_corr = test_data.corr()
-    print(cont_cat_corr)
+    cont_cat_corr = df.corr()
 
     # this will hold out column pairs
     cols = []
@@ -386,7 +391,7 @@ def main():
 
     # plotting figure
     fig = go.Figure(data=[heat], layout=layout)
-    fig.write_html(file="cont_cat_corr_matrix.html")
+    fig.write_html(file="plots/corr/cont_cat_corr_matrix.html")
     # fig.show()
 
     # filling columns on output table
@@ -394,7 +399,50 @@ def main():
     cont_cat_output_table["Correlation Ratio"] = out_corr
     cont_cat_output_table["Absolute Value of Correlation"] = abs_out_corr
 
+    # plots for cont/cat table
+    # fig = px.histogram(df, x='age', color='pclass')
+    # fig.show()
+    i = 0
+    for column_x in df:
+        for column_y in df:
+            if column_x != column_y and i <= len(cont_cat_output_table):
+                # violin plot
+                fig = px.violin(df, x=column_y, y=column_x, color=column_x)
+                fig.update_layout(title_text=f"{column_x}/{column_y}: violin plot")
+                fig.write_html(f"plots/violin/{column_x}_{column_y}_violin_plot.html")
+                cont_cat_output_table["Violin Plot"][
+                    i
+                ] = f"{column_x}_{column_y}_violin_plot"
+                cont_cat_output_table.style.format({"Violin Plot": make_clickable})
+
+                # dist plot
+                # switch x and y bc the plots made more sense upon display??
+                fig_2 = px.histogram(
+                    df, x=column_y, y=column_x, color=column_x, marginal="rug"
+                )
+                # fig_2.show()
+                fig_2.update_layout(
+                    title_text=f"{column_x}/{column_y}: dist plot",
+                    xaxis_title_text=f"{column_y}",
+                    yaxis_title_text=f"{column_x}",
+                )
+                fig_2.write_html(f"plots/hist/{column_x}_{column_y}_hist_plot.html")
+                cont_cat_output_table["Distribution Plot"][
+                    i
+                ] = f"{column_x}_{column_y}_dist_plot"
+                cont_cat_output_table.style.format({"Violin Plot": make_clickable})
+                i += 1
+            elif column_x == column_y:
+                i = i
+                continue
+            else:
+                break
+
     print(cont_cat_output_table)
+
+    #####################################################################
+    # CONT/CAT BRUTE FORCE TABLE
+    #####################################################################
 
 
 if __name__ == "__main__":
