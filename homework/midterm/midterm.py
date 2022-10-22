@@ -29,7 +29,7 @@ TITANIC_PREDICTORS = [
 ]
 
 
-# make linked cells
+# make links clickable
 def make_clickable(val):
     return '<a href="{}">{}</a>'.format(val, val)
 
@@ -237,6 +237,9 @@ def main():
                 cont_cont_output_table["Linear Regression Plot"][
                     i
                 ] = f"{column_x}_{column_y}_linear_model"
+                cont_cont_output_table.style.format(
+                    {"Linear Regression Plot": make_clickable}
+                )
                 # fig.show()
                 i += 1
             elif column_x == column_y:
@@ -246,6 +249,55 @@ def main():
                 break
 
     print(cont_cont_output_table)
+
+    # cont/cont Brute force table
+    cont_cont_brute_force = pd.DataFrame(
+        columns=[
+            "Predictors",
+            "Difference of Mean Response",
+            "Weighted Difference of Mean Response",
+            "Bin Plot",
+            "Residual Plot",
+        ]
+    )
+
+    # calculate mean response
+    mse = []
+    w_mse = []
+    i = 0
+    for column_x in df_continuous:
+
+        for column_y in df_continuous:
+            if column_x != column_y and i < len(cont_cont_output_table):
+                a = np.array(
+                    [list(df_continuous[column_x]), list(df_continuous[column_y])]
+                )
+                # formula for standard error
+                mse.append(np.std(a, ddof=1) / np.sqrt(np.size(a)))
+                weight = sum(df_continuous[column_x] * df_continuous[column_y]) / sum(
+                    df_continuous[column_y]
+                )
+                sample_size = np.count_nonzero(a)
+                formula = np.sqrt(
+                    np.sum(
+                        df_continuous[column_y]
+                        * (df_continuous[column_x] - weight) ** 2
+                    )
+                    / np.sum(df_continuous[column_y] * (sample_size - 1) / sample_size)
+                )
+                w_mse.append(formula)
+                i += 1
+            elif column_x == column_y:
+                i = i
+                continue
+            else:
+                break
+
+    cont_cont_brute_force["Predictors"] = col_combs
+    cont_cont_brute_force["Difference of Mean Response"] = mse
+    cont_cont_brute_force["Weighted Difference of Mean Response"] = w_mse
+
+    print(cont_cont_brute_force)
 
 
 if __name__ == "__main__":
