@@ -400,8 +400,6 @@ def main():
     cont_cat_output_table["Absolute Value of Correlation"] = abs_out_corr
 
     # plots for cont/cat table
-    # fig = px.histogram(df, x='age', color='pclass')
-    # fig.show()
     i = 0
     for column_x in df:
         for column_y in df:
@@ -443,6 +441,61 @@ def main():
     #####################################################################
     # CONT/CAT BRUTE FORCE TABLE
     #####################################################################
+    cont_cat_brute_force = pd.DataFrame(
+        columns=[
+            "Predictors",
+            "Difference of Mean Response",
+            "Weighted Difference of Mean Response",
+            "Bin Plot",
+            "Residual Plot",
+        ]
+    )
+    print(df_categorical.dtypes)
+    print(df_categorical.head())
+    for variable in df:
+        if df[variable].dtype != "float":
+            df[variable] = df[variable].astype("category")
+            df[variable] = df[variable].cat.codes
+
+    print(df.head())
+    # calculate mean response
+    mse = []
+    w_mse = []
+    i = 0
+    for column_x in df:
+        for column_y in df:
+            if column_x != column_y and i < len(cont_cat_output_table):
+                a = np.array([list(df[column_x]), list(df[column_y])])
+                # formula for standard error
+                mse.append(np.std(a, ddof=1) / np.sqrt(np.size(a)))
+                weight = sum(df[column_x] * df[column_y]) / sum(df[column_y])
+                sample_size = np.count_nonzero(a)
+                formula = np.sqrt(
+                    np.sum(df[column_y] * (df[column_x] - weight) ** 2)
+                    / np.sum(df[column_y] * (sample_size - 1) / sample_size)
+                )
+                w_mse.append(formula)
+                # added binned plots later
+                i += 1
+            elif column_x == column_y:
+                i = i
+                continue
+            else:
+                break
+
+    cont_cat_brute_force["Predictors"] = col_combs
+    cont_cat_brute_force["Difference of Mean Response"] = mse
+    cont_cat_brute_force["Weighted Difference of Mean Response"] = w_mse
+
+    print(cont_cat_brute_force)
+
+    #####################################################################
+    # WRITING TO HTML TABLE OUTPUT
+    #####################################################################
+    """html = cont_cat_output_table.to_html()
+    text_file = open("index.html", "w")
+    text_file.write(html)
+    text_file.close()"""
 
 
 if __name__ == "__main__":
