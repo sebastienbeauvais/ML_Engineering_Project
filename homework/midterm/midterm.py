@@ -9,6 +9,7 @@ import pandas
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objs as go
+import scipy.stats as stats
 import seaborn
 from sklearn import datasets
 
@@ -488,6 +489,139 @@ def main():
     cont_cat_brute_force["Weighted Difference of Mean Response"] = w_mse
 
     print(cont_cat_brute_force)
+
+    #####################################################################
+    # CAT/CAT OUTPUT TABLE
+    #####################################################################
+    # defining the output table
+    cat_cat_output_table = pd.DataFrame(
+        columns=[
+            "Predictors",
+            "Cramer's V",
+            "Absolute Value of Correlation",
+            "Heatmap",
+        ]
+    )
+
+    # correlation between cont/cat predictors
+    cat_cat_corr = df_categorical.corr()
+
+    # this will hold our column pairs
+    cols = []
+
+    # loop through column names to get combinations
+    for L in range(len(cat_cat_corr) + 1):
+        for subset in itertools.combinations(cat_cat_corr, L):
+            cols = list(subset)
+
+    # getting combinations of columns
+    col_combs = ["/".join(map(str, comb)) for comb in itertools.combinations(cols, 2)]
+
+    # heatmap plot for all cat/cat variables
+    mask = np.triu(np.ones_like(cat_cat_corr, dtype=bool))
+    rLT = cat_cat_corr.mask(mask)
+    abs_rLT = abs(rLT)
+
+    # getting them into a list for output table
+    whole_list = []
+    for row in rLT.values.tolist():
+        partial_list = []
+        for column in row:
+            if pd.notna(column):
+                partial_list.append(column)
+        whole_list.append(partial_list)
+
+    # flatten list for correlation values
+    out_corr = [item for sublist in whole_list for item in sublist]
+
+    # same but for abs values as above
+    whole_list = []
+    for row in abs_rLT.values.tolist():
+        partial_list = []
+        for column in row:
+            if pd.notna(column):
+                partial_list.append(column)
+        whole_list.append(partial_list)
+
+    # flatten list for correlation values
+    abs_out_corr = [item for sublist in whole_list for item in sublist]
+
+    # defining heatmap
+    heat = go.Heatmap(
+        z=rLT,
+        x=rLT.columns.values,
+        y=rLT.columns.values,
+        zmin=-0.25,
+        xgap=1,
+        ygap=1,
+    )
+
+    # formatting heatmap
+    title = "Cat/Cat Predictor Correlation Matrix"
+    layout = go.Layout(
+        title_text=title,
+        title_x=0.5,
+        width=600,
+        height=600,
+        xaxis_showgrid=False,
+        yaxis_showgrid=False,
+        yaxis_autorange="reversed",
+    )
+
+    # plotting figure
+    fig = go.Figure(data=[heat], layout=layout)
+    fig.write_html(file="plots/corr/cat_cat_corr_matrix.html")
+    # fig.show()
+
+    # filling columns on output table
+    cat_cat_output_table["Predictors"] = col_combs
+
+    # converting categoricals to numbers
+    print(df_categorical.dtypes)
+    for variable in df_categorical:
+        if (
+            df_categorical[variable].dtype == "object"
+            or df_categorical[variable].dtype == "category"
+        ):
+            df_categorical[variable] = df_categorical[variable].astype("category")
+            df_categorical[variable] = df_categorical[variable].cat.codes
+
+    # plots for cat/cat table
+    i = 0
+    for column_x in df_categorical:
+        for column_y in df_categorical:
+            if column_x != column_y and i <= len(cat_cat_output_table):
+
+                # cramers v calculation
+                temp_dat = []
+                dat1 = df_categorical[column_x].tolist()
+                dat2 = df_categorical[column_y].tolist()
+                temp_dat.append(dat1)
+                temp_dat.append(dat2)
+                cramer_data = np.array(temp_dat)
+                X2 = stats.chi2_contingency(cramer_data, correction=False)[0]
+                N = np.sum(cramer_data)
+                minimum_dimension = min(cramer_data.shape) - 1
+                result = np.sqrt((X2 / N) / minimum_dimension)
+                cat_cat_output_table["Cramer's V"][i] = result
+                cat_cat_output_table["Absolute Value of Correlation"][i] = result
+
+                # fig.show()
+                cat_cat_output_table["Heatmap"][i] = f"{column_x}_{column_y}_heatmap"
+                cat_cat_output_table.style.format({"Heatmap": make_clickable})
+
+                i += 1
+            elif column_x == column_y:
+                i = i
+                continue
+            else:
+                break
+
+    print(cat_cat_output_table)
+
+    #####################################################################
+    # CAT/CAT BRUTEFORCE TABLE
+    #####################################################################
 
     #####################################################################
     # WRITING TO HTML TABLE OUTPUT
