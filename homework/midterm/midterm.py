@@ -451,8 +451,6 @@ def main():
             "Residual Plot",
         ]
     )
-    print(df_categorical.dtypes)
-    print(df_categorical.head())
     for variable in df:
         if df[variable].dtype != "float":
             df[variable] = df[variable].astype("category")
@@ -622,7 +620,53 @@ def main():
     #####################################################################
     # CAT/CAT BRUTEFORCE TABLE
     #####################################################################
+    cat_cat_brute_force = pd.DataFrame(
+        columns=[
+            "Predictors",
+            "Difference of Mean Response",
+            "Weighted Difference of Mean Response",
+            "Bin Plot",
+            "Residual Plot",
+        ]
+    )
 
+    # calculate mean response
+    mse = []
+    w_mse = []
+    i = 0
+    for column_x in df_categorical:
+        for column_y in df_categorical:
+            if column_x != column_y and i < len(cat_cat_output_table):
+                a = np.array(
+                    [list(df_categorical[column_x]), list(df_categorical[column_y])]
+                )
+                # formula for standard error
+                mse.append(np.std(a, ddof=1) / np.sqrt(np.size(a)))
+                weight = sum(df_categorical[column_x] * df_categorical[column_y]) / sum(
+                    df_categorical[column_y]
+                )
+                sample_size = np.count_nonzero(a)
+                formula = np.sqrt(
+                    np.sum(
+                        df_categorical[column_y]
+                        * (df_categorical[column_x] - weight) ** 2
+                    )
+                    / np.sum(df_categorical[column_y] * (sample_size - 1) / sample_size)
+                )
+                w_mse.append(formula)
+                # added binned plots later
+                i += 1
+            elif column_x == column_y:
+                i = i
+                continue
+            else:
+                break
+
+    cat_cat_brute_force["Predictors"] = col_combs
+    cat_cat_brute_force["Difference of Mean Response"] = mse
+    cat_cat_brute_force["Weighted Difference of Mean Response"] = w_mse
+
+    print(cat_cat_brute_force)
     #####################################################################
     # WRITING TO HTML TABLE OUTPUT
     #####################################################################
