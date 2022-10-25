@@ -3,7 +3,6 @@ import random
 import sys
 from typing import List
 
-# import matplotlib.pyplot as plt
 import numpy as np
 import pandas
 import pandas as pd
@@ -529,9 +528,6 @@ def main():
                 partial_list.append(column)
         whole_list.append(partial_list)
 
-    # flatten list for correlation values
-    out_corr = [item for sublist in whole_list for item in sublist]
-
     # same but for abs values as above
     whole_list = []
     for row in abs_rLT.values.tolist():
@@ -540,9 +536,6 @@ def main():
             if pd.notna(column):
                 partial_list.append(column)
         whole_list.append(partial_list)
-
-    # flatten list for correlation values
-    abs_out_corr = [item for sublist in whole_list for item in sublist]
 
     # defining heatmap
     heat = go.Heatmap(
@@ -604,7 +597,20 @@ def main():
                 cat_cat_output_table["Cramer's V"][i] = result
                 cat_cat_output_table["Absolute Value of Correlation"][i] = result
 
+                heat_data = df_categorical[[column_x, column_y]]
+                heat_data = heat_data.corr()
+                fig = go.Figure()
+                fig.add_trace(
+                    go.Heatmap(
+                        x=heat_data.columns, y=heat_data.index, z=np.array(heat_data)
+                    )
+                )
+                fig.write_html(
+                    file=f"plots/corr/cat_cat_{column_x}_{column_y}_matrix.html"
+                )
+
                 # fig.show()
+
                 cat_cat_output_table["Heatmap"][i] = f"{column_x}_{column_y}_heatmap"
                 cat_cat_output_table.style.format({"Heatmap": make_clickable})
 
@@ -667,13 +673,24 @@ def main():
     cat_cat_brute_force["Weighted Difference of Mean Response"] = w_mse
 
     print(cat_cat_brute_force)
+
     #####################################################################
     # WRITING TO HTML TABLE OUTPUT
     #####################################################################
-    """html = cont_cat_output_table.to_html()
-    text_file = open("index.html", "w")
-    text_file.write(html)
-    text_file.close()"""
+    with open("index.html", "w") as _file:
+        _file.write(
+            cont_cont_output_table.to_html()
+            + "\n\n"
+            + cont_cont_brute_force.to_html()
+            + "\n\n"
+            + cont_cat_output_table.to_html()
+            + "\n\n"
+            + cont_cat_brute_force.to_html()
+            + "\n\n"
+            + cat_cat_output_table.to_html()
+            + "\n\n"
+            + cat_cat_brute_force.to_html()
+        )
 
 
 if __name__ == "__main__":
