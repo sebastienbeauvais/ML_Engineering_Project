@@ -331,8 +331,6 @@ def main():
 
     # correlation between cont/cat predictors
     cont_cat_corr = all_preds.corr()
-    print(all_preds.dtypes)
-    print(all_preds.corr())
 
     # this will hold out column pairs
     cols = []
@@ -582,6 +580,8 @@ def main():
     # filling columns on output table
     cat_cat_output_table["Predictors"] = col_combs
 
+    plots_df = df_categorical.select_dtypes(exclude="category")
+
     # converting categoricals to numbers
     for variable in df_categorical:
         if (
@@ -610,24 +610,6 @@ def main():
                 result = np.sqrt((X2 / N) / minimum_dimension)
                 cat_cat_output_table["Cramer's V"][i] = result
                 cat_cat_output_table["Absolute Value of Correlation"][i] = result
-
-                heat_data = df_categorical[[column_x, column_y]]
-                heat_data = heat_data.corr()
-                fig = go.Figure()
-                fig.add_trace(
-                    go.Heatmap(
-                        x=heat_data.columns, y=heat_data.index, z=np.array(heat_data)
-                    )
-                )
-                fig.write_html(
-                    file=f"plots/corr/cat_cat_{column_x}_{column_y}_matrix.html"
-                )
-
-                # fig.show()
-                # heatmap names are wrong..
-                cat_cat_output_table["Heatmap"][i] = f"{column_x}_{column_y}_heatmap"
-                cat_cat_output_table.style.format({"Heatmap": make_clickable})
-
                 i += 1
             elif column_x == column_y:
                 i = i
@@ -635,6 +617,29 @@ def main():
             else:
                 break
 
+    # getting heat plots for each pair
+    p_heat_l = []
+    for column_x in plots_df:
+        for column_y in plots_df:
+            if (
+                cont_cat_output_table["Predictors"]
+                .str.contains(f"{column_x}/{column_y}")
+                .any()
+            ):
+                heat_data = plots_df[[column_x, column_y]]
+                heat_data = heat_data.corr()
+                p_heat = go.Figure()
+                p_heat.add_trace(
+                    go.Heatmap(
+                        x=heat_data.columns, y=heat_data.index, z=np.array(heat_data)
+                    )
+                )
+                p_heat_l.append(f"{column_x}_{column_y}_heat_plot")
+                p_heat.write_html(
+                    file=f"plots/corr/cat_cat_{column_x}_{column_y}_matrix.html"
+                )
+
+    cat_cat_output_table["Heatmap"] = p_heat_l
     cat_cat_output_table = cat_cat_output_table.sort_values(
         by=["Absolute Value of Correlation"], ascending=False
     )
