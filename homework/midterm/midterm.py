@@ -4,7 +4,6 @@ import sys
 from typing import List
 
 import numpy as np
-import pandas
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objs as go
@@ -31,11 +30,11 @@ TITANIC_PREDICTORS = [
 
 # make links clickable
 def make_clickable(val):
-    return '<a href="{}">{}</a>'.format(val, val)
+    return f'<a target="_blank" href="{val}">{val}</a>'
 
 
 # dataset loader
-def get_test_data_set(data_set_name: str = None) -> (pandas.DataFrame, List[str], str):
+def get_test_data_set(data_set_name: str = None) -> (pd.DataFrame, List[str], str):
     """Function to load a few test data sets
 
     :param:
@@ -43,7 +42,7 @@ def get_test_data_set(data_set_name: str = None) -> (pandas.DataFrame, List[str]
         Data set to load
 
     :return:
-    data_set : :class:`pandas.DataFrame`
+    data_set : :class:`pd.DataFrame`
         Tabular data, possibly with some preprocessing applied.
     predictors :list[str]
         List of predictor variables
@@ -95,15 +94,15 @@ def get_test_data_set(data_set_name: str = None) -> (pandas.DataFrame, List[str]
     elif data_set_name in sklearn_data_sets:
         if data_set_name == "boston":
             data = datasets.load_boston()
-            data_set = pandas.DataFrame(data.data, columns=data.feature_names)
+            data_set = pd.DataFrame(data.data, columns=data.feature_names)
             data_set["CHAS"] = data_set["CHAS"].astype(str)
         elif data_set_name == "diabetes":
             data = datasets.load_diabetes()
-            data_set = pandas.DataFrame(data.data, columns=data.feature_names)
+            data_set = pd.DataFrame(data.data, columns=data.feature_names)
             data_set["gender"] = ["1" if i > 0 else "0" for i in data_set["sex"]]
         elif data_set_name == "breast_cancer":
             data = datasets.load_breast_cancer()
-            data_set = pandas.DataFrame(data.data, columns=data.feature_names)
+            data_set = pd.DataFrame(data.data, columns=data.feature_names)
 
         data_set["target"] = data.target
         predictors = data.feature_names
@@ -118,13 +117,13 @@ def main():
     test_data, predictors, response = get_test_data_set(data_set_name="titanic")
 
     # get response out of test_data
-    df = test_data.iloc[:, test_data.columns != response]
+    all_preds = test_data.iloc[:, test_data.columns != response]
 
     # splitting dataset predictors into categorical and continuous
-    df_continuous = df.select_dtypes(include="float")
-    df_categorical = df.select_dtypes(exclude="float")
-    print(df_continuous.head(5))
-    print(df_categorical.head(5))
+    df_continuous = all_preds.select_dtypes(include="float")
+    df_categorical = all_preds.select_dtypes(exclude="float")
+    # print(df_continuous.head(5))
+    # print(df_categorical.head(5))
 
     #####################################################################
     # CONT/CONT OUTPUT TABLE
@@ -144,7 +143,7 @@ def main():
         columns=[
             "Predictors",
             "Pearson's r",
-            "Abs Value of Pearson",
+            "Absolute Value of Pearson",
             "Linear Regression Plot",
         ]
     )
@@ -213,16 +212,16 @@ def main():
         yaxis_autorange="reversed",
     )
 
-    fig = go.Figure(data=[heat], layout=layout)
+    cont_cont_heat = go.Figure(data=[heat], layout=layout)
 
     # writing heatmap to html for linking in table
-    fig.write_html(file="plots/corr/cont_cont_corr_matrix.html")
+    cont_cont_heat.write_html(file="plots/corr/cont_cont_corr_matrix.html")
     # fig.show()
 
     # adding variables to cont/cont output table
     cont_cont_output_table["Predictors"] = col_combs
     cont_cont_output_table["Pearson's r"] = pearsons_r
-    cont_cont_output_table["Abs Value of Pearson"] = abs_pearson
+    cont_cont_output_table["Absolute Value of Pearson"] = abs_pearson
 
     # Linear regression for each cont/cont predictors
     i = 0
@@ -240,7 +239,7 @@ def main():
                     title=f"{column_x}/{column_y}: (t-value={t_val} p-value={p_val})",
                 )
                 fig.write_html(f"plots/lm/{column_x}_{column_y}_linear_model.html")
-                # still  need to add link
+                # add links
                 cont_cont_output_table["Linear Regression Plot"][
                     i
                 ] = f"{column_x}_{column_y}_linear_model"
@@ -255,7 +254,10 @@ def main():
             else:
                 break
 
-    print(cont_cont_output_table)
+    # print(cont_cont_output_table)
+    cont_cont_output_table = cont_cont_output_table.sort_values(
+        by=["Absolute Value of Pearson"], ascending=False
+    )
 
     #####################################################################
     # CONT/CONT BRUTE FORCE TABLE
@@ -276,7 +278,6 @@ def main():
     w_mse = []
     i = 0
     for column_x in df_continuous:
-
         for column_y in df_continuous:
             if column_x != column_y and i < len(cont_cont_output_table):
                 a = np.array(
@@ -307,8 +308,12 @@ def main():
     cont_cont_brute_force["Predictors"] = col_combs
     cont_cont_brute_force["Difference of Mean Response"] = mse
     cont_cont_brute_force["Weighted Difference of Mean Response"] = w_mse
+    # sorting values for output table
+    cont_cont_brute_force = cont_cont_brute_force.sort_values(
+        by=["Weighted Difference of Mean Response"], ascending=False
+    )
 
-    print(cont_cont_brute_force)
+    # print(cont_cont_brute_force)
 
     #####################################################################
     # CONT/CAT OUTPUT TABLE
@@ -325,7 +330,9 @@ def main():
     )
 
     # correlation between cont/cat predictors
-    cont_cat_corr = df.corr()
+    cont_cat_corr = all_preds.corr()
+    print(all_preds.dtypes)
+    print(all_preds.corr())
 
     # this will hold out column pairs
     cols = []
@@ -390,8 +397,8 @@ def main():
     )
 
     # plotting figure
-    fig = go.Figure(data=[heat], layout=layout)
-    fig.write_html(file="plots/corr/cont_cat_corr_matrix.html")
+    cont_cat_heat = go.Figure(data=[heat], layout=layout)
+    cont_cat_heat.write_html(file="plots/corr/cont_cat_corr_matrix.html")
     # fig.show()
 
     # filling columns on output table
@@ -400,43 +407,48 @@ def main():
     cont_cat_output_table["Absolute Value of Correlation"] = abs_out_corr
 
     # plots for cont/cat table
-    i = 0
-    for column_x in df:
-        for column_y in df:
-            if column_x != column_y and i <= len(cont_cat_output_table):
-                # violin plot
-                fig = px.violin(df, x=column_y, y=column_x, color=column_x)
-                fig.update_layout(title_text=f"{column_x}/{column_y}: violin plot")
-                fig.write_html(f"plots/violin/{column_x}_{column_y}_violin_plot.html")
-                cont_cat_output_table["Violin Plot"][
-                    i
-                ] = f"{column_x}_{column_y}_violin_plot"
-                cont_cat_output_table.style.format({"Violin Plot": make_clickable})
+    v_l = []
+    h_l = []
+    for column_x in all_preds:
+        if all_preds[column_x].dtype != "category":
+            for column_y in all_preds:
+                if (
+                    cont_cat_output_table["Predictors"]
+                    .str.contains(f"{column_x}/{column_y}")
+                    .any()
+                ):
+                    # print({column_x},{column_y})
+                    violin = px.violin(
+                        all_preds, x=column_x, y=column_y, color=column_x
+                    )
+                    violin.update_layout(
+                        title_text=f"{column_x}/{column_y}: violin plot"
+                    )
+                    v_l.append(f"{column_x}_{column_y}_violin_plot")
+                    # violin.show()
+                    hist = px.histogram(
+                        all_preds,
+                        x=column_y,
+                        y=column_x,
+                        color=column_x,
+                        marginal="rug",
+                    )
+                    # hist.show()
+                    hist.update_layout(
+                        title_text=f"{column_x}/{column_y}: dist plot",
+                        xaxis_title_text=f"{column_y}",
+                        yaxis_title_text=f"{column_x}",
+                    )
+                    h_l.append(f"{column_x}_{column_y}_dist_plot")
 
-                # dist plot
-                # switch x and y bc the plots made more sense upon display??
-                fig_2 = px.histogram(
-                    df, x=column_y, y=column_x, color=column_x, marginal="rug"
-                )
-                # fig_2.show()
-                fig_2.update_layout(
-                    title_text=f"{column_x}/{column_y}: dist plot",
-                    xaxis_title_text=f"{column_y}",
-                    yaxis_title_text=f"{column_x}",
-                )
-                fig_2.write_html(f"plots/hist/{column_x}_{column_y}_hist_plot.html")
-                cont_cat_output_table["Distribution Plot"][
-                    i
-                ] = f"{column_x}_{column_y}_dist_plot"
-                cont_cat_output_table.style.format({"Violin Plot": make_clickable})
-                i += 1
-            elif column_x == column_y:
-                i = i
-                continue
-            else:
-                break
+    cont_cat_output_table["Violin Plot"] = v_l
+    cont_cat_output_table["Distribution Plot"] = h_l
 
-    print(cont_cat_output_table)
+    # print(cont_cat_output_table)
+
+    cont_cat_output_table = cont_cat_output_table.sort_values(
+        by=["Absolute Value of Correlation"], ascending=False
+    )
 
     #####################################################################
     # CONT/CAT BRUTE FORCE TABLE
@@ -450,42 +462,45 @@ def main():
             "Residual Plot",
         ]
     )
-    for variable in df:
-        if df[variable].dtype != "float":
-            df[variable] = df[variable].astype("category")
-            df[variable] = df[variable].cat.codes
+    calc_df = all_preds.select_dtypes(exclude=["category"])
+    for variable in calc_df:
+        if calc_df[variable].dtype != "float":
+            calc_df[variable] = calc_df[variable].astype("category")
+            calc_df[variable] = calc_df[variable].cat.codes
 
-    print(df.head())
     # calculate mean response
     mse = []
     w_mse = []
-    i = 0
-    for column_x in df:
-        for column_y in df:
-            if column_x != column_y and i < len(cont_cat_output_table):
-                a = np.array([list(df[column_x]), list(df[column_y])])
-                # formula for standard error
-                mse.append(np.std(a, ddof=1) / np.sqrt(np.size(a)))
-                weight = sum(df[column_x] * df[column_y]) / sum(df[column_y])
-                sample_size = np.count_nonzero(a)
-                formula = np.sqrt(
-                    np.sum(df[column_y] * (df[column_x] - weight) ** 2)
-                    / np.sum(df[column_y] * (sample_size - 1) / sample_size)
-                )
-                w_mse.append(formula)
-                # added binned plots later
-                i += 1
-            elif column_x == column_y:
-                i = i
-                continue
-            else:
-                break
+    for column_x in calc_df:
+        if all_preds[column_x].dtype != "category":
+            for column_y in calc_df:
+                if (
+                    cont_cat_output_table["Predictors"]
+                    .str.contains(f"{column_x}/{column_y}")
+                    .any()
+                ):
+                    a = np.array([list(calc_df[column_x]), list(calc_df[column_y])])
+                    # formula for standard error
+                    mse.append(np.std(a, ddof=1) / np.sqrt(np.size(a)))
+                    weight = sum(calc_df[column_x] * calc_df[column_y]) / sum(
+                        calc_df[column_y]
+                    )
+                    sample_size = np.count_nonzero(a)
+                    formula = np.sqrt(
+                        np.sum(calc_df[column_y] * (calc_df[column_x] - weight) ** 2)
+                        / np.sum(calc_df[column_y] * (sample_size - 1) / sample_size)
+                    )
+                    w_mse.append(formula)
+                    # added binned plots later
 
     cont_cat_brute_force["Predictors"] = col_combs
     cont_cat_brute_force["Difference of Mean Response"] = mse
     cont_cat_brute_force["Weighted Difference of Mean Response"] = w_mse
+    cont_cat_brute_force = cont_cat_brute_force.sort_values(
+        by=["Weighted Difference of Mean Response"], ascending=False
+    )
 
-    print(cont_cat_brute_force)
+    # print(cont_cat_brute_force)
 
     #####################################################################
     # CAT/CAT OUTPUT TABLE
@@ -560,15 +575,14 @@ def main():
     )
 
     # plotting figure
-    fig = go.Figure(data=[heat], layout=layout)
-    fig.write_html(file="plots/corr/cat_cat_corr_matrix.html")
+    cat_cat_heat = go.Figure(data=[heat], layout=layout)
+    cat_cat_heat.write_html(file="plots/corr/cat_cat_corr_matrix.html")
     # fig.show()
 
     # filling columns on output table
     cat_cat_output_table["Predictors"] = col_combs
 
     # converting categoricals to numbers
-    print(df_categorical.dtypes)
     for variable in df_categorical:
         if (
             df_categorical[variable].dtype == "object"
@@ -610,7 +624,7 @@ def main():
                 )
 
                 # fig.show()
-
+                # heatmap names are wrong..
                 cat_cat_output_table["Heatmap"][i] = f"{column_x}_{column_y}_heatmap"
                 cat_cat_output_table.style.format({"Heatmap": make_clickable})
 
@@ -621,7 +635,11 @@ def main():
             else:
                 break
 
-    print(cat_cat_output_table)
+    cat_cat_output_table = cat_cat_output_table.sort_values(
+        by=["Absolute Value of Correlation"], ascending=False
+    )
+
+    # print(cat_cat_output_table)
 
     #####################################################################
     # CAT/CAT BRUTEFORCE TABLE
@@ -671,26 +689,44 @@ def main():
     cat_cat_brute_force["Predictors"] = col_combs
     cat_cat_brute_force["Difference of Mean Response"] = mse
     cat_cat_brute_force["Weighted Difference of Mean Response"] = w_mse
+    cat_cat_brute_force = cat_cat_brute_force.sort_values(
+        by=["Weighted Difference of Mean Response"], ascending=False
+    )
 
-    print(cat_cat_brute_force)
+    # print(cat_cat_brute_force)
 
     #####################################################################
     # WRITING TO HTML TABLE OUTPUT
     #####################################################################
-    with open("index.html", "w") as _file:
+    with open("midterm.html", "w") as _file:
         _file.write(
             cont_cont_output_table.to_html()
+            + "\n\n"
+            + cont_cont_heat.to_html()
             + "\n\n"
             + cont_cont_brute_force.to_html()
             + "\n\n"
             + cont_cat_output_table.to_html()
             + "\n\n"
+            + cont_cat_heat.to_html()
+            + "\n\n"
             + cont_cat_brute_force.to_html()
             + "\n\n"
             + cat_cat_output_table.to_html()
             + "\n\n"
+            + cat_cat_heat.to_html()
+            + "\n\n"
             + cat_cat_brute_force.to_html()
         )
+
+    test_df = pd.DataFrame(
+        {
+            "name": ["Softhints", "DataScientyst"],
+            "url": ["https://www.softhints.com", "https://datascientyst.com"],
+        }
+    )
+
+    test_df.style.format({"url": make_clickable})
 
 
 if __name__ == "__main__":
