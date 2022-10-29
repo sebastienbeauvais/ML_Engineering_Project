@@ -30,7 +30,13 @@ TITANIC_PREDICTORS = [
 
 # make links clickable
 def make_clickable(val):
-    return f'<a target="_blank" href="{val}">{val}</a>'
+    name, url = val.split("#")
+    return f'<a target="_blank" href="{url}">{name}</a>'
+
+
+def make_clickable_names(val):
+    name, url = val.split("#")
+    return f'<a target="_blank" href="{url}">{name}</a>'
 
 
 # dataset loader
@@ -114,7 +120,7 @@ def get_test_data_set(data_set_name: str = None) -> (pd.DataFrame, List[str], st
 
 def main():
     # loading a test dataset
-    test_data, predictors, response = get_test_data_set(data_set_name="titanic")
+    test_data, predictors, response = get_test_data_set(data_set_name="mpg")
 
     # get response out of test_data
     all_preds = test_data.iloc[:, test_data.columns != response]
@@ -225,6 +231,14 @@ def main():
 
     # Linear regression for each cont/cont predictors
     lm_l = []
+    names = []
+    urls = []
+    links_df = pd.DataFrame(
+        columns=[
+            "name",
+            "url",
+        ]
+    )
     for column_x in df_continuous:
         for column_y in df_continuous:
             if (
@@ -245,13 +259,15 @@ def main():
                 )
                 lm.write_html(file=f"plots/lm/{column_x}_{column_y}_linear_model.html")
                 # add links
-
-                cont_cont_output_table.style.format(
-                    {"Linear Regression Plot": make_clickable}
-                )
+                names.append(f"{column_x}_{column_y}_linear_model")
+                urls.append(f"plots/lm/{column_x}_{column_y}_linear_model.html")
 
     # print(cont_cont_output_table)
-    cont_cont_output_table["Linear Regression Plot"] = lm_l
+    links_df["name"] = names
+    links_df["url"] = urls
+    links_df["name_url"] = links_df["name"] + "#" + links_df["url"]
+
+    cont_cont_output_table["Linear Regression Plot"] = links_df["name_url"]
     cont_cont_output_table = cont_cont_output_table.sort_values(
         by=["Absolute Value of Pearson"], ascending=False
     )
@@ -445,6 +461,22 @@ def main():
     # plots for cont/cat table
     v_l = []
     h_l = []
+    names_1 = []
+    urls_1 = []
+    links_df_1 = pd.DataFrame(
+        columns=[
+            "name",
+            "url",
+        ]
+    )
+    names_2 = []
+    urls_2 = []
+    links_df_2 = pd.DataFrame(
+        columns=[
+            "name",
+            "url",
+        ]
+    )
     for column_x in all_preds:
         if all_preds[column_x].dtype != "category":
             for column_y in all_preds:
@@ -464,6 +496,10 @@ def main():
                     violin.write_html(
                         file=f"plots/violin/cont_cat_{column_x}_{column_y}_violin_plot.html"
                     )
+                    names_2.append(f"{column_x}_{column_y}_violin_plot")
+                    urls_2.append(
+                        f"plots/violin/cont_cat_{column_x}_{column_y}_violin_plot.html"
+                    )
                     # violin.show()
                     hist = px.histogram(
                         all_preds,
@@ -476,15 +512,28 @@ def main():
                     hist.update_layout(
                         title_text=f"{column_x}/{column_y}: dist plot",
                         xaxis_title_text=f"{column_x}",
-                        yaxis_title_text=f"{column_y}",
+                        # yaxis_title_text=f"{column_y}",
                     )
                     h_l.append(f"{column_x}_{column_y}_dist_plot")
                     hist.write_html(
                         file=f"plots/hist/cont_cat_{column_x}_{column_y}_hist_plot.html"
                     )
+                    names_1.append(f"{column_x}_{column_y}_dist_plot")
+                    urls_1.append(
+                        f"plots/hist/cont_cat_{column_x}_{column_y}_hist_plot.html"
+                    )
 
-    cont_cat_output_table["Violin Plot"] = v_l
-    cont_cat_output_table["Distribution Plot"] = h_l
+    # print(cont_cont_output_table)
+    links_df_1["name"] = names_1
+    links_df_1["url"] = urls_1
+    links_df_1["name_url"] = links_df_1["name"] + "#" + links_df_1["url"]
+
+    links_df_2["name"] = names_2
+    links_df_2["url"] = urls_2
+    links_df_2["name_url"] = links_df_2["name"] + "#" + links_df_2["url"]
+
+    cont_cat_output_table["Violin Plot"] = links_df_2["name_url"]
+    cont_cat_output_table["Distribution Plot"] = links_df_1["name_url"]
 
     # print(cont_cat_output_table)
 
@@ -508,7 +557,7 @@ def main():
     calc_df = all_preds.select_dtypes(exclude=["category"])
     cont_cat_brute_force["Predictors"] = col_combs
 
-    # binned plot - probably wrong, very confused
+    """# binned plot - probably wrong, very confused
     bins_uw = []
     for col_x in calc_df:
         for col_y in calc_df:
@@ -517,7 +566,6 @@ def main():
                 .str.contains(f"{col_x}/{col_y}")
                 .any()
             ):
-                # added binned plots later
                 df = calc_df[col_x], calc_df[col_y]
                 uw = px.density_heatmap(
                     df,
@@ -534,9 +582,9 @@ def main():
                 )
                 bins_uw.append(f"{col_x}_{col_y}_avg_response")
                 uw.write_html(
-                    f"plots/binned_uw/{column_x}_{column_y}_probability_density_plot.html"
+                    f"plots/binned_uw/{col_x}_{col_y}_probability_density_plot.html"
                 )
-                # uw.show()
+                uw.show()"""
 
     for variable in calc_df:
         if calc_df[variable].dtype != "float":
@@ -575,7 +623,7 @@ def main():
 
     cont_cat_brute_force["Difference of Mean Response"] = mse
     cont_cat_brute_force["Weighted Difference of Mean Response"] = w_mse
-    cont_cat_brute_force["Bin Plot"] = bins_uw
+    # cont_cat_brute_force["Bin Plot"] = bins_uw
     cont_cat_brute_force = cont_cat_brute_force.sort_values(
         by=["Weighted Difference of Mean Response"], ascending=False
     )
@@ -700,6 +748,14 @@ def main():
                 break
 
     # getting heat plots for each pair
+    names = []
+    urls = []
+    links_df = pd.DataFrame(
+        columns=[
+            "name",
+            "url",
+        ]
+    )
     p_heat_l = []
     for column_x in plots_df:
         for column_y in plots_df:
@@ -720,8 +776,16 @@ def main():
                 p_heat.write_html(
                     file=f"plots/corr/cat_cat_{column_x}_{column_y}_matrix.html"
                 )
+                # add links
+                names.append(f"{column_x}_{column_y}_heat_plot")
+                urls.append(f"plots/corr/cat_cat_{column_x}_{column_y}_matrix.html")
 
-    cat_cat_output_table["Heatmap"] = p_heat_l
+    # print(cont_cont_output_table)
+    links_df["name"] = names
+    links_df["url"] = urls
+    links_df["name_url"] = links_df["name"] + "#" + links_df["url"]
+
+    cat_cat_output_table["Heatmap"] = links_df["name_url"]
     cat_cat_output_table = cat_cat_output_table.sort_values(
         by=["Absolute Value of Correlation"], ascending=False
     )
@@ -742,7 +806,7 @@ def main():
     )
     cat_cat_brute_force["Predictors"] = col_combs
 
-    # binned plot - probably wrong, very confused
+    """# binned plot - probably wrong, very confused
     bins_uw = []
     for col_x in calc_df:
         for col_y in calc_df:
@@ -766,7 +830,7 @@ def main():
                 uw.write_html(
                     f"plots/binned_uw/{column_x}_{column_y}_probability_density_plot.html"
                 )
-                # uw.show()
+                # uw.show()"""
 
     # calculate mean response
     mse = []
@@ -802,7 +866,7 @@ def main():
 
     cat_cat_brute_force["Difference of Mean Response"] = mse
     cat_cat_brute_force["Weighted Difference of Mean Response"] = w_mse
-    cat_cat_brute_force["Bin Plot"] = bins_uw
+    # cat_cat_brute_force["Bin Plot"] = bins_uw
     cat_cat_brute_force = cat_cat_brute_force.sort_values(
         by=["Weighted Difference of Mean Response"], ascending=False
     )
@@ -814,33 +878,30 @@ def main():
     #####################################################################
     with open("midterm.html", "w") as _file:
         _file.write(
-            cont_cont_output_table.to_html()
+            cont_cont_output_table.style.format(
+                {"Linear Regression Plot": make_clickable}
+            ).to_html(escape=False)
             + "\n\n"
             + cont_cont_heat.to_html()
             + "\n\n"
-            + cont_cont_brute_force.to_html()
+            + cont_cont_brute_force.to_html(escape=False)
             + "\n\n"
-            + cont_cat_output_table.to_html()
+            + cont_cat_output_table.style.format(
+                {"Violin Plot": make_clickable, "Distribution Plot": make_clickable}
+            ).to_html(escape=False)
             + "\n\n"
             + cont_cat_heat.to_html()
             + "\n\n"
-            + cont_cat_brute_force.to_html()
+            + cont_cat_brute_force.to_html(escape=False)
             + "\n\n"
-            + cat_cat_output_table.to_html()
+            + cat_cat_output_table.style.format({"Heatmap": make_clickable}).to_html(
+                escape=False
+            )
             + "\n\n"
             + cat_cat_heat.to_html()
             + "\n\n"
-            + cat_cat_brute_force.to_html()
+            + cat_cat_brute_force.to_html(escape=False)
         )
-
-    test_df = pd.DataFrame(
-        {
-            "name": ["Softhints", "DataScientyst"],
-            "url": ["https://www.softhints.com", "https://datascientyst.com"],
-        }
-    )
-
-    test_df.style.format({"url": make_clickable})
 
 
 if __name__ == "__main__":
