@@ -224,37 +224,34 @@ def main():
     cont_cont_output_table["Absolute Value of Pearson"] = abs_pearson
 
     # Linear regression for each cont/cont predictors
-    i = 0
+    lm_l = []
     for column_x in df_continuous:
         for column_y in df_continuous:
-            if column_x != column_y and i <= len(cont_cont_output_table):
-                fig = px.scatter(df_continuous, x=column_x, y=column_y, trendline="ols")
-                results = px.get_trendline_results(fig)
+            if (
+                cont_cont_output_table["Predictors"]
+                .str.contains(f"{column_x}/{column_y}")
+                .any()
+            ):
+                lm_l.append(f"{column_x}_{column_y}_linear_model")
+                lm = px.scatter(df_continuous, x=column_x, y=column_y, trendline="ols")
+                results = px.get_trendline_results(lm)
                 # results = results.iloc[0]["px_fit_results"].summary()
                 t_val = results.iloc[0]["px_fit_results"].tvalues
                 t_val = round(t_val[1], 6)
                 p_val = results.iloc[0]["px_fit_results"].pvalues
                 p_val = p_val[1]
-                fig.update_layout(
+                lm.update_layout(
                     title=f"{column_x}/{column_y}: (t-value={t_val} p-value={p_val})",
                 )
-                fig.write_html(f"plots/lm/{column_x}_{column_y}_linear_model.html")
+                lm.write_html(file=f"plots/lm/{column_x}_{column_y}_linear_model.html")
                 # add links
-                cont_cont_output_table["Linear Regression Plot"][
-                    i
-                ] = f"{column_x}_{column_y}_linear_model"
+
                 cont_cont_output_table.style.format(
                     {"Linear Regression Plot": make_clickable}
                 )
-                # fig.show()
-                i += 1
-            elif column_x == column_y:
-                i = i
-                continue
-            else:
-                break
 
     # print(cont_cont_output_table)
+    cont_cont_output_table["Linear Regression Plot"] = lm_l
     cont_cont_output_table = cont_cont_output_table.sort_values(
         by=["Absolute Value of Pearson"], ascending=False
     )
@@ -272,6 +269,36 @@ def main():
             "Residual Plot",
         ]
     )
+    cont_cont_brute_force["Predictors"] = col_combs
+
+    bins_uw = []
+    for col_x in df_continuous:
+        for col_y in df_continuous:
+            if (
+                cont_cont_brute_force["Predictors"]
+                .str.contains(f"{col_x}/{col_y}")
+                .any()
+            ):
+                # added binned plots later
+                df = df_continuous[col_x], df_continuous[col_y]
+                uw = px.density_heatmap(
+                    df,
+                    x=df_continuous[col_x],
+                    y=df_continuous[col_y],
+                    histfunc="avg",
+                    histnorm="probability",
+                    text_auto=True,
+                )
+                uw.update_layout(
+                    title_text=f"{col_x}_{col_y}_unweighted",
+                    xaxis_title=f"{col_x}",
+                    yaxis_title=f"{col_y}",
+                )
+                bins_uw.append(f"{col_x}_{col_y}_avg_response")
+                uw.write_html(
+                    f"plots/binned_uw/{col_x}_{col_y}_probability_density_plot.html"
+                )
+                # uw.show()
 
     # calculate mean response
     mse = []
@@ -279,35 +306,46 @@ def main():
     i = 0
     for column_x in df_continuous:
         for column_y in df_continuous:
-            if column_x != column_y and i < len(cont_cont_output_table):
+            if (
+                cont_cont_brute_force["Predictors"]
+                .str.contains(f"{column_x}/{column_y}")
+                .any()
+            ):
                 a = np.array(
                     [list(df_continuous[column_x]), list(df_continuous[column_y])]
                 )
-                # formula for standard error
+                # difference of mean response
                 mse.append(np.std(a, ddof=1) / np.sqrt(np.size(a)))
+
+                # weighted difference
                 weight = sum(df_continuous[column_x] * df_continuous[column_y]) / sum(
                     df_continuous[column_y]
                 )
                 sample_size = np.count_nonzero(a)
+
                 formula = np.sqrt(
-                    np.sum(
-                        df_continuous[column_y]
-                        * (df_continuous[column_x] - weight) ** 2
+                    abs(
+                        np.sum(
+                            df_continuous[column_y]
+                            * (df_continuous[column_x] - weight) ** 2
+                        )
+                        / np.sum(
+                            df_continuous[column_y] * (sample_size - 1) / sample_size
+                        )
                     )
-                    / np.sum(df_continuous[column_y] * (sample_size - 1) / sample_size)
                 )
                 w_mse.append(formula)
                 # added binned plots later
-                i += 1
-            elif column_x == column_y:
-                i = i
-                continue
-            else:
-                break
+                data = {
+                    "x": df_continuous[column_x],
+                    "y": df_continuous[column_y],
+                }
+                df = pd.DataFrame(data)
+                # weighted plot
 
-    cont_cont_brute_force["Predictors"] = col_combs
     cont_cont_brute_force["Difference of Mean Response"] = mse
     cont_cont_brute_force["Weighted Difference of Mean Response"] = w_mse
+    cont_cont_brute_force["Bin Plot"] = bins_uw
     # sorting values for output table
     cont_cont_brute_force = cont_cont_brute_force.sort_values(
         by=["Weighted Difference of Mean Response"], ascending=False
@@ -423,21 +461,27 @@ def main():
                         title_text=f"{column_x}/{column_y}: violin plot"
                     )
                     v_l.append(f"{column_x}_{column_y}_violin_plot")
+                    violin.write_html(
+                        file=f"plots/violin/cont_cat_{column_x}_{column_y}_violin_plot.html"
+                    )
                     # violin.show()
                     hist = px.histogram(
                         all_preds,
-                        x=column_y,
-                        y=column_x,
+                        x=column_x,
+                        y=column_y,
                         color=column_x,
                         marginal="rug",
                     )
                     # hist.show()
                     hist.update_layout(
                         title_text=f"{column_x}/{column_y}: dist plot",
-                        xaxis_title_text=f"{column_y}",
-                        yaxis_title_text=f"{column_x}",
+                        xaxis_title_text=f"{column_x}",
+                        yaxis_title_text=f"{column_y}",
                     )
                     h_l.append(f"{column_x}_{column_y}_dist_plot")
+                    hist.write_html(
+                        file=f"plots/hist/cont_cat_{column_x}_{column_y}_hist_plot.html"
+                    )
 
     cont_cat_output_table["Violin Plot"] = v_l
     cont_cat_output_table["Distribution Plot"] = h_l
@@ -460,7 +504,40 @@ def main():
             "Residual Plot",
         ]
     )
+
     calc_df = all_preds.select_dtypes(exclude=["category"])
+    cont_cat_brute_force["Predictors"] = col_combs
+
+    # binned plot - probably wrong, very confused
+    bins_uw = []
+    for col_x in calc_df:
+        for col_y in calc_df:
+            if (
+                cont_cat_brute_force["Predictors"]
+                .str.contains(f"{col_x}/{col_y}")
+                .any()
+            ):
+                # added binned plots later
+                df = calc_df[col_x], calc_df[col_y]
+                uw = px.density_heatmap(
+                    df,
+                    x=calc_df[col_x],
+                    y=calc_df[col_y],
+                    histfunc="avg",
+                    histnorm="probability",
+                    text_auto=True,
+                )
+                uw.update_layout(
+                    title_text=f"{col_x}_{col_y}_unweighted",
+                    xaxis_title=f"{col_x}",
+                    yaxis_title=f"{col_y}",
+                )
+                bins_uw.append(f"{col_x}_{col_y}_avg_response")
+                uw.write_html(
+                    f"plots/binned_uw/{column_x}_{column_y}_probability_density_plot.html"
+                )
+                # uw.show()
+
     for variable in calc_df:
         if calc_df[variable].dtype != "float":
             calc_df[variable] = calc_df[variable].astype("category")
@@ -485,15 +562,20 @@ def main():
                     )
                     sample_size = np.count_nonzero(a)
                     formula = np.sqrt(
-                        np.sum(calc_df[column_y] * (calc_df[column_x] - weight) ** 2)
-                        / np.sum(calc_df[column_y] * (sample_size - 1) / sample_size)
+                        abs(
+                            np.sum(
+                                calc_df[column_y] * (calc_df[column_x] - weight) ** 2
+                            )
+                            / np.sum(
+                                calc_df[column_y] * (sample_size - 1) / sample_size
+                            )
+                        )
                     )
                     w_mse.append(formula)
-                    # added binned plots later
 
-    cont_cat_brute_force["Predictors"] = col_combs
     cont_cat_brute_force["Difference of Mean Response"] = mse
     cont_cat_brute_force["Weighted Difference of Mean Response"] = w_mse
+    cont_cat_brute_force["Bin Plot"] = bins_uw
     cont_cat_brute_force = cont_cat_brute_force.sort_values(
         by=["Weighted Difference of Mean Response"], ascending=False
     )
@@ -658,6 +740,33 @@ def main():
             "Residual Plot",
         ]
     )
+    cat_cat_brute_force["Predictors"] = col_combs
+
+    # binned plot - probably wrong, very confused
+    bins_uw = []
+    for col_x in calc_df:
+        for col_y in calc_df:
+            if cat_cat_brute_force["Predictors"].str.contains(f"{col_x}/{col_y}").any():
+                # added binned plots later
+                df = calc_df[col_x], calc_df[col_y]
+                uw = px.density_heatmap(
+                    df,
+                    x=calc_df[col_x],
+                    y=calc_df[col_y],
+                    histfunc="avg",
+                    histnorm="probability",
+                    text_auto=True,
+                )
+                uw.update_layout(
+                    title_text=f"{col_x}_{col_y}_unweighted",
+                    xaxis_title=f"{col_x}",
+                    yaxis_title=f"{col_y}",
+                )
+                bins_uw.append(f"{col_x}_{col_y}_avg_response")
+                uw.write_html(
+                    f"plots/binned_uw/{column_x}_{column_y}_probability_density_plot.html"
+                )
+                # uw.show()
 
     # calculate mean response
     mse = []
@@ -691,9 +800,9 @@ def main():
             else:
                 break
 
-    cat_cat_brute_force["Predictors"] = col_combs
     cat_cat_brute_force["Difference of Mean Response"] = mse
     cat_cat_brute_force["Weighted Difference of Mean Response"] = w_mse
+    cat_cat_brute_force["Bin Plot"] = bins_uw
     cat_cat_brute_force = cat_cat_brute_force.sort_values(
         by=["Weighted Difference of Mean Response"], ascending=False
     )
