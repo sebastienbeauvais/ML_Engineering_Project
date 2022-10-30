@@ -120,7 +120,10 @@ def get_test_data_set(data_set_name: str = None) -> (pd.DataFrame, List[str], st
 
 def main():
     # loading a test dataset
-    test_data, predictors, response = get_test_data_set(data_set_name="mpg")
+    # working: titanic, mpg, diabetes
+    # broken: titanic_2,
+    # very broken: breast_cancer
+    test_data, predictors, response = get_test_data_set()
 
     # get response out of test_data
     all_preds = test_data.iloc[:, test_data.columns != response]
@@ -783,9 +786,10 @@ def main():
     # print(cont_cont_output_table)
     links_df["name"] = names
     links_df["url"] = urls
-    links_df["name_url"] = links_df["name"] + "#" + links_df["url"]
+    if len(links_df) > 1:
+        links_df["name_url"] = links_df["name"] + "#" + links_df["url"]
+        cat_cat_output_table["Heatmap"] = links_df["name_url"]
 
-    cat_cat_output_table["Heatmap"] = links_df["name_url"]
     cat_cat_output_table = cat_cat_output_table.sort_values(
         by=["Absolute Value of Correlation"], ascending=False
     )
