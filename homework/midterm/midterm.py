@@ -121,9 +121,9 @@ def get_test_data_set(data_set_name: str = None) -> (pd.DataFrame, List[str], st
 def main():
     # loading a test dataset
     # working: titanic, mpg, diabetes
-    # broken: titanic_2,
-    # very broken: breast_cancer
-    test_data, predictors, response = get_test_data_set()
+    # broken: titanic_2, tips
+    # very broken: breast_cancer, boston
+    test_data, predictors, response = get_test_data_set(data_set_name="diabetes")
 
     # get response out of test_data
     all_preds = test_data.iloc[:, test_data.columns != response]
@@ -242,35 +242,41 @@ def main():
             "url",
         ]
     )
-    for column_x in df_continuous:
-        for column_y in df_continuous:
-            if (
-                cont_cont_output_table["Predictors"]
-                .str.contains(f"{column_x}/{column_y}")
-                .any()
-            ):
-                lm_l.append(f"{column_x}_{column_y}_linear_model")
-                lm = px.scatter(df_continuous, x=column_x, y=column_y, trendline="ols")
-                results = px.get_trendline_results(lm)
-                # results = results.iloc[0]["px_fit_results"].summary()
-                t_val = results.iloc[0]["px_fit_results"].tvalues
-                t_val = round(t_val[1], 6)
-                p_val = results.iloc[0]["px_fit_results"].pvalues
-                p_val = p_val[1]
-                lm.update_layout(
-                    title=f"{column_x}/{column_y}: (t-value={t_val} p-value={p_val})",
-                )
-                lm.write_html(file=f"plots/lm/{column_x}_{column_y}_linear_model.html")
-                # add links
-                names.append(f"{column_x}_{column_y}_linear_model")
-                urls.append(f"plots/lm/{column_x}_{column_y}_linear_model.html")
+    if len(df_continuous.axes[1]) >= 2:
+        for column_x in df_continuous:
+            for column_y in df_continuous:
+                if (
+                    cont_cont_output_table["Predictors"]
+                    .str.contains(f"{column_x}/{column_y}")
+                    .any()
+                ):
+                    lm_l.append(f"{column_x}_{column_y}_linear_model")
+                    lm = px.scatter(
+                        df_continuous, x=column_x, y=column_y, trendline="ols"
+                    )
+                    results = px.get_trendline_results(lm)
+                    # results = results.iloc[0]["px_fit_results"].summary()
+                    t_val = results.iloc[0]["px_fit_results"].tvalues
+                    t_val = round(t_val[1], 6)
+                    p_val = results.iloc[0]["px_fit_results"].pvalues
+                    p_val = p_val[1]
+                    lm.update_layout(
+                        title=f"{column_x}/{column_y}: (t-value={t_val} p-value={p_val})",
+                    )
+                    lm.write_html(
+                        file=f"plots/lm/{column_x}_{column_y}_linear_model.html"
+                    )
+                    # add links
+                    names.append(f"{column_x}_{column_y}_linear_model")
+                    urls.append(f"plots/lm/{column_x}_{column_y}_linear_model.html")
 
-    # print(cont_cont_output_table)
-    links_df["name"] = names
-    links_df["url"] = urls
-    links_df["name_url"] = links_df["name"] + "#" + links_df["url"]
+        # print(cont_cont_output_table)
+        links_df["name"] = names
+        links_df["url"] = urls
+        links_df["name_url"] = links_df["name"] + "#" + links_df["url"]
 
-    cont_cont_output_table["Linear Regression Plot"] = links_df["name_url"]
+        cont_cont_output_table["Linear Regression Plot"] = links_df["name_url"]
+
     cont_cont_output_table = cont_cont_output_table.sort_values(
         by=["Absolute Value of Pearson"], ascending=False
     )
@@ -291,80 +297,84 @@ def main():
     cont_cont_brute_force["Predictors"] = col_combs
 
     bins_uw = []
-    for col_x in df_continuous:
-        for col_y in df_continuous:
-            if (
-                cont_cont_brute_force["Predictors"]
-                .str.contains(f"{col_x}/{col_y}")
-                .any()
-            ):
-                # added binned plots later
-                df = df_continuous[col_x], df_continuous[col_y]
-                uw = px.density_heatmap(
-                    df,
-                    x=df_continuous[col_x],
-                    y=df_continuous[col_y],
-                    histfunc="avg",
-                    histnorm="probability",
-                    text_auto=True,
-                )
-                uw.update_layout(
-                    title_text=f"{col_x}_{col_y}_unweighted",
-                    xaxis_title=f"{col_x}",
-                    yaxis_title=f"{col_y}",
-                )
-                bins_uw.append(f"{col_x}_{col_y}_avg_response")
-                uw.write_html(
-                    f"plots/binned_uw/{col_x}_{col_y}_probability_density_plot.html"
-                )
-                # uw.show()
+    if len(df_continuous.axes[1]) >= 2:
+        for col_x in df_continuous:
+            for col_y in df_continuous:
+                if (
+                    cont_cont_brute_force["Predictors"]
+                    .str.contains(f"{col_x}/{col_y}")
+                    .any()
+                ):
+                    # added binned plots later
+                    df = df_continuous[col_x], df_continuous[col_y]
+                    uw = px.density_heatmap(
+                        df,
+                        x=df_continuous[col_x],
+                        y=df_continuous[col_y],
+                        histfunc="avg",
+                        histnorm="probability",
+                        text_auto=True,
+                    )
+                    uw.update_layout(
+                        title_text=f"{col_x}_{col_y}_unweighted",
+                        xaxis_title=f"{col_x}",
+                        yaxis_title=f"{col_y}",
+                    )
+                    bins_uw.append(f"{col_x}_{col_y}_avg_response")
+                    uw.write_html(
+                        f"plots/binned_uw/{col_x}_{col_y}_probability_density_plot.html"
+                    )
+                    # uw.show()
 
     # calculate mean response
     mse = []
     w_mse = []
     i = 0
-    for column_x in df_continuous:
-        for column_y in df_continuous:
-            if (
-                cont_cont_brute_force["Predictors"]
-                .str.contains(f"{column_x}/{column_y}")
-                .any()
-            ):
-                a = np.array(
-                    [list(df_continuous[column_x]), list(df_continuous[column_y])]
-                )
-                # difference of mean response
-                mse.append(np.std(a, ddof=1) / np.sqrt(np.size(a)))
+    if len(df_continuous.axes[1]) >= 2:
+        for column_x in df_continuous:
+            for column_y in df_continuous:
+                if (
+                    cont_cont_brute_force["Predictors"]
+                    .str.contains(f"{column_x}/{column_y}")
+                    .any()
+                ):
+                    a = np.array(
+                        [list(df_continuous[column_x]), list(df_continuous[column_y])]
+                    )
+                    # difference of mean response
+                    mse.append(np.std(a, ddof=1) / np.sqrt(np.size(a)))
 
-                # weighted difference
-                weight = sum(df_continuous[column_x] * df_continuous[column_y]) / sum(
-                    df_continuous[column_y]
-                )
-                sample_size = np.count_nonzero(a)
+                    # weighted difference
+                    weight = sum(
+                        df_continuous[column_x] * df_continuous[column_y]
+                    ) / sum(df_continuous[column_y])
+                    sample_size = np.count_nonzero(a)
 
-                formula = np.sqrt(
-                    abs(
-                        np.sum(
-                            df_continuous[column_y]
-                            * (df_continuous[column_x] - weight) ** 2
-                        )
-                        / np.sum(
-                            df_continuous[column_y] * (sample_size - 1) / sample_size
+                    formula = np.sqrt(
+                        abs(
+                            np.sum(
+                                df_continuous[column_y]
+                                * (df_continuous[column_x] - weight) ** 2
+                            )
+                            / np.sum(
+                                df_continuous[column_y]
+                                * (sample_size - 1)
+                                / sample_size
+                            )
                         )
                     )
-                )
-                w_mse.append(formula)
-                # added binned plots later
-                data = {
-                    "x": df_continuous[column_x],
-                    "y": df_continuous[column_y],
-                }
-                df = pd.DataFrame(data)
-                # weighted plot
+                    w_mse.append(formula)
+                    # added binned plots later
+                    data = {
+                        "x": df_continuous[column_x],
+                        "y": df_continuous[column_y],
+                    }
+                    df = pd.DataFrame(data)
+                    # weighted plot
 
-    cont_cont_brute_force["Difference of Mean Response"] = mse
-    cont_cont_brute_force["Weighted Difference of Mean Response"] = w_mse
-    cont_cont_brute_force["Bin Plot"] = bins_uw
+        cont_cont_brute_force["Difference of Mean Response"] = mse
+        cont_cont_brute_force["Weighted Difference of Mean Response"] = w_mse
+        cont_cont_brute_force["Bin Plot"] = bins_uw
     # sorting values for output table
     cont_cont_brute_force = cont_cont_brute_force.sort_values(
         by=["Weighted Difference of Mean Response"], ascending=False
@@ -713,7 +723,7 @@ def main():
     # filling columns on output table
     cat_cat_output_table["Predictors"] = col_combs
 
-    plots_df = df_categorical.select_dtypes(exclude="category")
+    # plots_df = df_categorical.select_dtypes(exclude="category")
 
     # converting categoricals to numbers
     for variable in df_categorical:
@@ -726,29 +736,30 @@ def main():
 
     # plots for cat/cat table
     i = 0
-    for column_x in df_categorical:
-        for column_y in df_categorical:
-            if column_x != column_y and i <= len(cat_cat_output_table):
+    if len(df_categorical.axes[1]) >= 2:
+        for column_x in df_categorical:
+            for column_y in df_categorical:
+                if column_x != column_y and i <= len(cat_cat_output_table):
 
-                # cramers v calculation
-                temp_dat = []
-                dat1 = df_categorical[column_x].tolist()
-                dat2 = df_categorical[column_y].tolist()
-                temp_dat.append(dat1)
-                temp_dat.append(dat2)
-                cramer_data = np.array(temp_dat)
-                X2 = stats.chi2_contingency(cramer_data, correction=False)[0]
-                N = np.sum(cramer_data)
-                minimum_dimension = min(cramer_data.shape) - 1
-                result = np.sqrt((X2 / N) / minimum_dimension)
-                cat_cat_output_table["Cramer's V"][i] = result
-                cat_cat_output_table["Absolute Value of Correlation"][i] = result
-                i += 1
-            elif column_x == column_y:
-                i = i
-                continue
-            else:
-                break
+                    # cramers v calculation
+                    temp_dat = []
+                    dat1 = df_categorical[column_x].tolist()
+                    dat2 = df_categorical[column_y].tolist()
+                    temp_dat.append(dat1)
+                    temp_dat.append(dat2)
+                    cramer_data = np.array(temp_dat)
+                    X2 = stats.chi2_contingency(cramer_data, correction=False)[0]
+                    N = np.sum(cramer_data)
+                    minimum_dimension = min(cramer_data.shape) - 1
+                    result = np.sqrt((X2 / N) / minimum_dimension)
+                    cat_cat_output_table["Cramer's V"][i] = result
+                    cat_cat_output_table["Absolute Value of Correlation"][i] = result
+                    i += 1
+                elif column_x == column_y:
+                    i = i
+                    continue
+                else:
+                    break
 
     # getting heat plots for each pair
     names = []
@@ -760,32 +771,35 @@ def main():
         ]
     )
     p_heat_l = []
-    for column_x in plots_df:
-        for column_y in plots_df:
-            if (
-                cont_cat_output_table["Predictors"]
-                .str.contains(f"{column_x}/{column_y}")
-                .any()
-            ):
-                heat_data = plots_df[[column_x, column_y]]
-                heat_data = heat_data.corr()
-                p_heat = go.Figure()
-                p_heat.add_trace(
-                    go.Heatmap(
-                        x=heat_data.columns, y=heat_data.index, z=np.array(heat_data)
+    if len(df_categorical.axes[1]) >= 2:
+        for column_x in df_categorical:
+            for column_y in df_categorical:
+                if (
+                    cont_cat_output_table["Predictors"]
+                    .str.contains(f"{column_x}/{column_y}")
+                    .any()
+                ):
+                    heat_data = df_categorical[[column_x, column_y]]
+                    heat_data = heat_data.corr()
+                    p_heat = go.Figure()
+                    p_heat.add_trace(
+                        go.Heatmap(
+                            x=heat_data.columns,
+                            y=heat_data.index,
+                            z=np.array(heat_data),
+                        )
                     )
-                )
-                p_heat_l.append(f"{column_x}_{column_y}_heat_plot")
-                p_heat.write_html(
-                    file=f"plots/corr/cat_cat_{column_x}_{column_y}_matrix.html"
-                )
-                # add links
-                names.append(f"{column_x}_{column_y}_heat_plot")
-                urls.append(f"plots/corr/cat_cat_{column_x}_{column_y}_matrix.html")
+                    p_heat_l.append(f"{column_x}_{column_y}_heat_plot")
+                    p_heat.write_html(
+                        file=f"plots/corr/cat_cat_{column_x}_{column_y}_matrix.html"
+                    )
+                    # add links
+                    names.append(f"{column_x}_{column_y}_heat_plot")
+                    urls.append(f"plots/corr/cat_cat_{column_x}_{column_y}_matrix.html")
 
-    # print(cont_cont_output_table)
-    links_df["name"] = names
-    links_df["url"] = urls
+        # print(cont_cont_output_table)
+        links_df["name"] = names
+        links_df["url"] = urls
     if len(links_df) > 1:
         links_df["name_url"] = links_df["name"] + "#" + links_df["url"]
         cat_cat_output_table["Heatmap"] = links_df["name_url"]
@@ -840,37 +854,40 @@ def main():
     mse = []
     w_mse = []
     i = 0
-    for column_x in df_categorical:
-        for column_y in df_categorical:
-            if column_x != column_y and i < len(cat_cat_output_table):
-                a = np.array(
-                    [list(df_categorical[column_x]), list(df_categorical[column_y])]
-                )
-                # formula for standard error
-                mse.append(np.std(a, ddof=1) / np.sqrt(np.size(a)))
-                weight = sum(df_categorical[column_x] * df_categorical[column_y]) / sum(
-                    df_categorical[column_y]
-                )
-                sample_size = np.count_nonzero(a)
-                formula = np.sqrt(
-                    np.sum(
-                        df_categorical[column_y]
-                        * (df_categorical[column_x] - weight) ** 2
+    if len(df_categorical.axes[1]) >= 2:
+        for column_x in df_categorical:
+            for column_y in df_categorical:
+                if column_x != column_y and i < len(cat_cat_output_table):
+                    a = np.array(
+                        [list(df_categorical[column_x]), list(df_categorical[column_y])]
                     )
-                    / np.sum(df_categorical[column_y] * (sample_size - 1) / sample_size)
-                )
-                w_mse.append(formula)
-                # added binned plots later
-                i += 1
-            elif column_x == column_y:
-                i = i
-                continue
-            else:
-                break
+                    # formula for standard error
+                    mse.append(np.std(a, ddof=1) / np.sqrt(np.size(a)))
+                    weight = sum(
+                        df_categorical[column_x] * df_categorical[column_y]
+                    ) / sum(df_categorical[column_y])
+                    sample_size = np.count_nonzero(a)
+                    formula = np.sqrt(
+                        np.sum(
+                            df_categorical[column_y]
+                            * (df_categorical[column_x] - weight) ** 2
+                        )
+                        / np.sum(
+                            df_categorical[column_y] * (sample_size - 1) / sample_size
+                        )
+                    )
+                    w_mse.append(formula)
+                    # added binned plots later
+                    i += 1
+                elif column_x == column_y:
+                    i = i
+                    continue
+                else:
+                    break
 
-    cat_cat_brute_force["Difference of Mean Response"] = mse
-    cat_cat_brute_force["Weighted Difference of Mean Response"] = w_mse
-    # cat_cat_brute_force["Bin Plot"] = bins_uw
+        cat_cat_brute_force["Difference of Mean Response"] = mse
+        cat_cat_brute_force["Weighted Difference of Mean Response"] = w_mse
+        # cat_cat_brute_force["Bin Plot"] = bins_uw
     cat_cat_brute_force = cat_cat_brute_force.sort_values(
         by=["Weighted Difference of Mean Response"], ascending=False
     )
@@ -880,6 +897,38 @@ def main():
     #####################################################################
     # WRITING TO HTML TABLE OUTPUT
     #####################################################################
+    # using multiple files to still get output with broken datasets
+    with open("cont_cont_out.html", "w") as _file:
+        _file.write(
+            cont_cont_output_table.style.format(
+                {"Linear Regression Plot": make_clickable}
+            ).to_html(escape=False)
+            + "\n\n"
+            + cont_cont_heat.to_html()
+            + "\n\n"
+            + cont_cont_brute_force.to_html(escape=False)
+        )
+    with open("cont_cat_out.html", "w") as _file:
+        _file.write(
+            cont_cat_output_table.style.format(
+                {"Violin Plot": make_clickable, "Distribution Plot": make_clickable}
+            ).to_html(escape=False)
+            + "\n\n"
+            + cont_cat_heat.to_html()
+            + "\n\n"
+            + cont_cat_brute_force.to_html(escape=False)
+        )
+    with open("cat_cat_out.html", "w") as _file:
+        _file.write(
+            cat_cat_output_table.style.format({"Heatmap": make_clickable}).to_html(
+                escape=False
+            )
+            + "\n\n"
+            + cat_cat_heat.to_html()
+            + "\n\n"
+            + cat_cat_brute_force.to_html(escape=False)
+        )
+    # also writing one big file with all tables if all tables run
     with open("midterm.html", "w") as _file:
         _file.write(
             cont_cont_output_table.style.format(
@@ -889,7 +938,6 @@ def main():
             + cont_cont_heat.to_html()
             + "\n\n"
             + cont_cont_brute_force.to_html(escape=False)
-            + "\n\n"
             + cont_cat_output_table.style.format(
                 {"Violin Plot": make_clickable, "Distribution Plot": make_clickable}
             ).to_html(escape=False)
@@ -897,7 +945,6 @@ def main():
             + cont_cat_heat.to_html()
             + "\n\n"
             + cont_cat_brute_force.to_html(escape=False)
-            + "\n\n"
             + cat_cat_output_table.style.format({"Heatmap": make_clickable}).to_html(
                 escape=False
             )
