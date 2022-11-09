@@ -8,25 +8,6 @@ show columns from pitcher_counts;
 show columns from pitchersInGame;
 
 #####################################################################
-# Dropping all self made tables
-#####################################################################
-DROP TABLE IF EXISTS temp_stats;
-DROP TABLE IF EXISTS hist_bat_avg;
-DROP TABLE IF EXISTS temp_year;
-DROP TABLE IF EXISTS yearly_bat_avg;
-DROP TABLE IF EXISTS temp_rolling;
-DROP TABLE IF EXISTS overall_rolling_avg;
-
-#####################################################################
-# creating indexes
-#####################################################################
-CREATE INDEX batter_stats_idx
-ON batter_counts(batter, Hit, atBat, game_id);
-
-CREATE INDEX games_idx
-ON game(game_id);
-
-#####################################################################
 # Historical Batting Average
 #####################################################################
 CREATE TEMPORARY TABLE temp_stats
@@ -95,7 +76,7 @@ ORDER BY
 	g.game_id DESC
 ;
 
-CREATE TABLE overall_rolling_avg
+CREATE TABLE overall_rolling_avg ENGINE=MEMORY
 SELECT *,
 	AVG(overall_batting_avg) OVER (ORDER BY game_id, ora_date ROWS BETWEEN
 	100 PRECEDING AND 1 PRECEDING) AS rolling_avg
@@ -260,28 +241,102 @@ LIMIT
     0,100;
 
 #####################################################################
-# Test queries for each table
+# 8: Homeruns per hits
 #####################################################################
-SELECT *
-FROM hist_bat_avg
+CREATE TEMPORARY TABLE batting_hrh
+SELECT
+    batter,
+    SUM(Hit) AS total_hit,
+    SUM(Home_Run) AS total_hr,
+	(SUM(Home_Run)/SUM(Hit)) AS batting_hrh
+FROM
+    batter_counts
+GROUP BY
+    batter;
+
+#####################################################################
+# 9: Strikeouts per hits
+#####################################################################
+CREATE TEMPORARY TABLE batting_soh
+SELECT
+    batter,
+    SUM(Hit) AS total_hit,
+    SUM(Strikeout) AS total_so,
+	(SUM(Strikeout)/SUM(Hit)) AS batting_soh
+FROM
+    batter_counts
+GROUP BY
+    batter;
+
+#####################################################################
+# 10: Strikeouts to pitches thrown
+#####################################################################
+CREATE TEMPORARY TABLE pitcher_sot
+SELECT
+    pitcher,
+    SUM(pitchesThrown) AS total_throw,
+    SUM(Strikeout) AS total_so,
+	(SUM(Strikeout)/SUM(pitchesThrown)) AS pitcher_sot
+FROM
+    pitcher_counts
+GROUP BY
+    pitcher;
+
+#####################################################################
+# Table with all features (what will be run in python)
+#####################################################################
+CREATE OF MODIFY TABLE baseball_features
+SELECT
+	EXTRACT(YEAR FROM g.local_date) AS year,
+	bc.team_id,
+	g.game_id,
+	SUM(bc.Hit)/SUM(bc.atBat) AS batting_avg,
+	SUM(bc.Strikeout)/SUM(bc.Hit) AS batting_soh,
+	SUM(bc.Home_Run)/SUM(bc.Hit) AS batting_hrh,
+	SUM(bc.atBat/bc.Home_Run) AS ab_hr,
+	SUM(bc.Walk)/SUM(bc.Strikeout) AS bb_k,
+	CASE
+		WHEN SUM(pc.pitchesThrown) = 0 THEN 0
+		ELSE SUM(pc.Hit)/SUM(pc.pitchesThrown)
+	END AS htt,
+	CASE
+		WHEN SUM(pc.pitchesThrown) = 0 THEN 0
+		ELSE SUM(pc.Strikeout)/SUM(pc.pitchesThrown)
+	END AS stt,
+	CASE
+		WHEN SUM(pc.Strikeout) = 0 THEN 0
+		ELSE SUM(pc.Hit)/SUM(pc.Strikeout)
+	END AS hso,
+	CASE
+		WHEN SUM(pc.endingInning-pc.startingInning) = 0 THEN 0
+		ELSE SUM(pc.Walk)+SUM(pc.Hit)/SUM(pc.endingInning-pc.startingInning)
+	END AS whip,
+	CASE
+		WHEN SUM(pc.atBat+pc.Walk+pc.Hit_By_Pitch+pc.Sac_Fly) = 0 THEN 0
+		ELSE SUM(pc.Hit+pc.Walk+pc.Hit_By_Pitch)/SUM(pc.atBat+pc.Walk+pc.Hit_By_Pitch+pc.Sac_Fly)
+	END AS obp,
+	SUM(pc.Strikeout)/SUM(pc.Walk) as k_bb,
+	CASE
+		WHEN tr.home_away = 'H' AND tr.win_lose = 'W' THEN 1
+		ELSE 0
+	END AS HomeTeamWins
+FROM
+	batter_counts bc
+JOIN game g
+ON g.game_id = bc.game_id
+JOIN pitcher_counts pc
+ON pc.game_id = g.game_id
+JOIN team_results tr
+ON tr.game_id = g.game_id
+GROUP BY
+	year, bc.team_id, g.game_id
+ORDER BY
+	year, bc.team_id DESC
 LIMIT 0,20;
 
-SELECT *
-FROM yearly_bat_avg
-LIMIT 0,20;
 
-SELECT *
-FROM overall_rolling_avg
-LIMIT 0,20;
 
-#####################################################################
-# Dropping Indexes
-#####################################################################
-ALTER TABLE batter_counts
-DROP INDEX batter_stats_idx;
 
-ALTER TABLE game
-DROP INDEX games_idx;
 
 
 

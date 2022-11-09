@@ -19,22 +19,51 @@ def main():
 
     query = """
         SELECT
-                g.game_id
-                , away_t.name AS away_team
-                , home_t.name AS home_team
-                , MAX(home_score) AS home_score
-                , MAX(away_score) AS away_score
-                , CASE
-                    WHEN MAX(home_score) > MAX(away_score) THEN CONCAT(home_t.name, " Wins")
-                    WHEN MAX(home_score) < MAX(away_score) THEN CONCAT(away_t.name, " Wins")
-                    ELSE CONCAT(home_t.name, " and ", away_t.name, " tied") END AS winning_team
-                , MAX(inning) AS last_inning
-            FROM inning i
-            JOIN game g ON g.game_id = i.game_id
-            JOIN team away_t ON g.away_team_id = away_t.team_id
-            JOIN team home_t ON g.home_team_id = home_t.team_id
-            GROUP BY g.game_id, away_t.name, home_t.name
-            ORDER BY g.game_id, away_t.name, home_t.name
+            EXTRACT(YEAR FROM g.local_date) AS year,
+            bc.team_id,
+            g.game_id,
+            SUM(bc.Hit)/SUM(bc.atBat) AS batting_avg,
+            SUM(bc.Strikeout)/SUM(bc.Hit) AS batting_soh,
+            SUM(bc.Home_Run)/SUM(bc.Hit) AS batting_hrh,
+            SUM(bc.atBat/bc.Home_Run) AS ab_hr,
+            SUM(bc.Walk)/SUM(bc.Strikeout) AS bb_k,
+            CASE
+                WHEN SUM(pc.pitchesThrown) = 0 THEN 0
+                ELSE SUM(pc.Hit)/SUM(pc.pitchesThrown)
+            END AS htt,
+            CASE
+                WHEN SUM(pc.pitchesThrown) = 0 THEN 0
+                ELSE SUM(pc.Strikeout)/SUM(pc.pitchesThrown)
+            END AS stt,
+            CASE
+                WHEN SUM(pc.Strikeout) = 0 THEN 0
+                ELSE SUM(pc.Hit)/SUM(pc.Strikeout)
+            END AS hso,
+            CASE
+                WHEN SUM(pc.endingInning-pc.startingInning) = 0 THEN 0
+                ELSE SUM(pc.Walk)+SUM(pc.Hit)/SUM(pc.endingInning-pc.startingInning)
+            END AS whip,
+            CASE
+                WHEN SUM(pc.atBat+pc.Walk+pc.Hit_By_Pitch+pc.Sac_Fly) = 0 THEN 0
+                ELSE SUM(pc.Hit+pc.Walk+pc.Hit_By_Pitch)/SUM(pc.atBat+pc.Walk+pc.Hit_By_Pitch+pc.Sac_Fly)
+            END AS obp,
+            SUM(pc.Strikeout)/SUM(pc.Walk) as k_bb,
+            CASE
+                WHEN tr.home_away = 'H' AND tr.win_lose = 'W' THEN 1
+                ELSE 0
+            END AS HomeTeamWins
+        FROM
+            batter_counts bc
+        JOIN game g
+        ON g.game_id = bc.game_id
+        JOIN pitcher_counts pc
+        ON pc.game_id = g.game_id
+        JOIN team_results tr
+        ON tr.game_id = g.game_id
+        GROUP BY
+            year, bc.team_id, g.game_id
+        ORDER BY
+            year, bc.team_id DESC
     """
     df = pandas.read_sql_query(query, sql_engine)
     print(df.head())
