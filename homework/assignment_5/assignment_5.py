@@ -1,10 +1,16 @@
+import itertools
 import sys
 
-import pandas
+import numpy as np
+import pandas as pd
+import plotly.graph_objs as go
 import sqlalchemy
+
+# from sklearn.model_selection import train_test_split_
 
 
 def main():
+    # CONNECTING TO DB
     db_user = "root"
     # pragma: allowlist nextline secret
     db_pass = "password"
@@ -65,8 +71,116 @@ def main():
         ORDER BY
             year, bc.team_id DESC
     """
-    df = pandas.read_sql_query(query, sql_engine)
-    print(df.head())
+    df = pd.read_sql_query(query, sql_engine)
+
+    # dropping useless column(s), maybe drop team_id??
+    df = df.drop(["game_id"], axis=1)
+
+    # making year a category
+    df = df.astype({"year": "category"})
+
+    # TRAIN TEST SPLIT
+    train_df = df[df["year"] != 2011]
+
+    # test will be last year available
+    # test_df = df[df['year'] == 2011]
+
+    X_train = train_df.loc[:, train_df.columns != "HomeTeamWins"]
+    # y_train = train_df.loc[:, train_df.columns == 'HomeTeamWins']
+
+    # X_test = test_df.loc[:, test_df.columns != 'HomeTeamWins']
+    # y_test = test_df.loc[:, test_df.columns == 'HomeTeamWins']
+    # print(df.head())
+
+    train_cont = X_train.select_dtypes(exclude="category")
+
+    #################################################
+    # CONT/CONT TABLE
+    #################################################
+
+    # defining table
+    cont_cont_output_table = pd.DataFrame(
+        columns=[
+            "Predictors",
+            "Pearson's R",
+        ]
+    )
+
+    # correlation between variables
+    pearson_corr = train_cont.corr()
+
+    # defining variable to hold combos
+    cols = []
+
+    # getting list of all combinations
+    for L in range(len(pearson_corr) + 1):
+        for subset in itertools.combinations(pearson_corr, L):
+            cols = list(subset)
+
+    # concating combinations to place in table
+    col_combos = ["/".join(map(str, comb)) for comb in itertools.combinations(cols, 2)]
+
+    # heatmap plot for cont/cont predictors
+    heat = go.Heatmap(
+        z=pearson_corr,
+        x=pearson_corr.columns.values,
+        y=pearson_corr.columns.values,
+        zmin=-0.25,
+        xgap=1,
+        ygap=1,
+        colorscale="haline",
+    )
+
+    # formatting heatmap
+    title = "Cont/Cont Predictor Correlation Matrix"
+    layout = go.Layout(
+        title_text=title,
+        title_x=0.5,
+        width=900,
+        height=600,
+        xaxis_showgrid=False,
+        yaxis_showgrid=False,
+        yaxis_autorange="reversed",
+    )
+
+    cont_cont_heat = go.Figure(data=[heat], layout=layout)
+    cont_cont_heat.show()
+
+    # writing to html
+
+    # extracting correlation values
+    mask = np.tril(np.ones_like(pearson_corr, dtype=bool))
+    rLT = pearson_corr.mask(mask)
+    abs_rLT = abs(rLT)
+
+    # getting them into a list for output table
+    whole_list = []
+    for row in rLT.values.tolist():
+        partial_list = []
+        for column in row:
+            if pd.notna(column):
+                partial_list.append(column)
+        whole_list.append(partial_list)
+
+    # flattened list of correlation values
+    pearsons_r = [item for sublist in whole_list for item in sublist]
+
+    # doing the same for absolute value of pearson
+    whole_list = []
+    for row in abs_rLT.values.tolist():
+        partial_list = []
+        for column in row:
+            if pd.notna(column):
+                partial_list.append(column)
+        whole_list.append(partial_list)
+
+    # flattened list of correlation values
+    abs_pearson = [item for sublist in whole_list for item in sublist]
+
+    # adding variables to cont/cont output table
+    cont_cont_output_table["Predictors"] = col_combos
+    cont_cont_output_table["Pearson's R"] = pearsons_r
+    cont_cont_output_table["Absolute Value of Pearson"] = abs_pearson
 
 
 if __name__ == "__main__":
