@@ -3,6 +3,7 @@ import sys
 
 import numpy as np
 import pandas as pd
+import plotly.express as px
 import plotly.graph_objs as go
 import sqlalchemy
 
@@ -181,6 +182,39 @@ def main():
     cont_cont_output_table["Predictors"] = col_combos
     cont_cont_output_table["Pearson's R"] = pearsons_r
     cont_cont_output_table["Absolute Value of Pearson"] = abs_pearson
+
+    # Linear regression for each cont/cont predictors
+    lm_l = []
+    """names = []
+    urls = []
+    links_df = pd.DataFrame(
+        columns=[
+            "name",
+            "url",
+        ]
+    )"""
+    if len(train_cont.axes[1]) >= 2:
+        for column_x in train_cont:
+            for column_y in train_cont:
+                if (
+                    cont_cont_output_table["Predictors"]
+                    .str.contains(f"{column_x}/{column_y}")
+                    .any()
+                ):
+                    lm_l.append("linear model")
+                    lm = px.scatter(train_cont, x=column_x, y=column_y, trendline="ols")
+                    results = px.get_trendline_results(lm)
+                    # results = results.iloc[0]["px_fit_results"].summary()
+                    t_val = results.iloc[0]["px_fit_results"].tvalues
+                    t_val = round(t_val[1], 6)
+                    p_val = results.iloc[0]["px_fit_results"].pvalues
+                    p_val = p_val[1]
+                    lm.update_layout(
+                        title=f"{column_x}/{column_y}: (t-value={t_val} p-value={p_val})",
+                    )
+
+        cont_cont_output_table["Linear Regression Plot"] = lm_l
+        print(cont_cont_output_table)
 
 
 if __name__ == "__main__":
