@@ -28,6 +28,9 @@ def main():
         SELECT
             EXTRACT(YEAR FROM g.local_date) AS year,
             bc.team_id,
+            t.league,
+            t.division,
+            bs.overcast,
             g.game_id,
             SUM(bc.Hit)/SUM(bc.atBat) AS batting_avg,
             SUM(bc.Strikeout)/SUM(bc.Hit) AS batting_soh,
@@ -67,6 +70,10 @@ def main():
         ON pc.game_id = g.game_id
         JOIN team_results tr
         ON tr.game_id = g.game_id
+        JOIN team t
+        ON t.team_id = tr.team_id
+        JOIN boxscore bs
+        ON bs.game_id = g.game_id
         GROUP BY
             year, bc.team_id, g.game_id
         ORDER BY
@@ -78,7 +85,15 @@ def main():
     df = df.drop(["game_id"], axis=1)
 
     # making year a category
-    df = df.astype({"year": "category"})
+    df = df.astype(
+        {
+            "year": "category",
+            "team_id": "category",
+            "league": "category",
+            "division": "category",
+            "overcast": "category",
+        }
+    )
 
     # TRAIN TEST SPLIT
     train_df = df[df["year"] != 2011]
@@ -94,6 +109,9 @@ def main():
     # print(df.head())
 
     train_cont = X_train.select_dtypes(exclude="category")
+    # train_cat = X_train.select_dtypes(include="category")
+
+    # make table and graphs for train_cont and train_cat
 
     #################################################
     # CONT/CONT TABLE
@@ -145,6 +163,8 @@ def main():
     )
 
     cont_cont_heat = go.Figure(data=[heat], layout=layout)
+
+    # display heatmap
     cont_cont_heat.show()
 
     # writing to html
@@ -213,8 +233,56 @@ def main():
                         title=f"{column_x}/{column_y}: (t-value={t_val} p-value={p_val})",
                     )
 
-        cont_cont_output_table["Linear Regression Plot"] = lm_l
-        print(cont_cont_output_table)
+    cont_cont_output_table["Linear Regression Plot"] = lm_l
+
+    #################################################
+    # CONT/CONT BRUTE FORCE TABLE
+    #################################################
+    cont_cont_brute_force = pd.DataFrame(
+        columns=[
+            "Predictor 1",
+            "Predictor 2",
+        ]
+    )
+    # getting list of predictor pairs
+    cont_cont_brute_force[["Predictor 1", "Predictor 2"]] = cont_cont_output_table[
+        "Predictors"
+    ].str.split("/", expand=True)
+
+    # getting sample mean, pop_mean for each predictor
+    for column in train_cont:
+        print(column)
+        temp_df = pd.DataFrame()  # initialize df to store calcs
+        temp_df[column] = train_cont[column]  # take col of interest for calcs
+        sample_mean = temp_df[column].mean()  # get mean of col
+        temp_df["bin"] = pd.cut(
+            train_cont[column], 10, right=True
+        )  # separate into 10 bins
+        temp_df["sample_mean"] = sample_mean  # set new col to mean
+        temp_df["bin_mean"] = temp_df.groupby("bin")[column].transform(
+            "mean"
+        )  # get mean of each bin
+        temp_df["bin_count"] = temp_df.groupby("bin")[column].transform(
+            "count"
+        )  # get count of each bin
+        temp_df = temp_df.drop(columns=[column])  # dropping base col to condense df
+        temp_df["diff_mean_resp"] = (
+            (temp_df["bin_mean"] - temp_df["sample_mean"]) ** 2
+        ) / 10  # calc mse
+        temp_df = temp_df.drop_duplicates().sort_values(
+            by="bin", ascending=True
+        )  # dropping dup cols
+        temp_df["population_proportion"] = temp_df["bin_count"].divide(
+            temp_df["bin_count"].sum()
+        )  # calc pop prop
+        temp_df["weighted_diff"] = temp_df["diff_mean_resp"].multiply(
+            temp_df["population_proportion"]
+        )  # wmse
+
+        # plots for each predictor
+        temp_df["bin"] = temp_df["bin"].astype("str")  # need to convert to str to plot
+        fig = px.bar(temp_df, x="bin", y="bin_count", title=column)
+        fig.show()
 
 
 if __name__ == "__main__":
