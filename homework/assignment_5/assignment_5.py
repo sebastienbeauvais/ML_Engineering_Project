@@ -1,11 +1,19 @@
 import itertools
 import sys
 
+import graphviz
 import numpy as np
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objs as go
 import sqlalchemy
+from sklearn import metrics, tree
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.linear_model import LogisticRegression
+from sklearn.metrics import confusion_matrix
+from sklearn.naive_bayes import GaussianNB
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.svm import SVC
 
 # from sklearn.model_selection import train_test_split_
 
@@ -24,7 +32,6 @@ def main():
 
     sql_engine = sqlalchemy.create_engine(connect_string)
 
-    # look into adding hometeam, awayteam and all stats on that
     query = """
         SELECT
             *
@@ -41,9 +48,8 @@ def main():
     df["better_hso"] = df["home_hso"] - df["away_hso"]
     df["better_k_bb"] = df["home_k_bb"] - df["away_k_bb"]
     df["better_obp"] = df["home_obp"] - df["away_obp"]
-    print(df.head())
 
-    # dropping useless column(s), maybe drop team_id??
+    # dropping useless column(s)
     df = df.drop(["game_id"], axis=1)
 
     # making year a category
@@ -52,31 +58,31 @@ def main():
             "year": "category",
         }
     )
+    # filling nan
+    df["HomeTeamWins"] = df["HomeTeamWins"].fillna(0)
 
     # TRAIN TEST SPLIT
     train_df = df[df["year"] != 2012]
 
     # test will be last year available
-    # test_df = df[df['year'] == 2012]
+    test_df = df[df["year"] == 2012]
 
     X_train = train_df.loc[:, train_df.columns != "HomeTeamWins"]
-    # y_train = train_df.loc[:, train_df.columns == 'HomeTeamWins']
+    y_train = train_df.loc[:, train_df.columns == "HomeTeamWins"]
+    y_train = y_train.values.ravel()
 
-    # X_test = test_df.loc[:, test_df.columns != 'HomeTeamWins']
-    # y_test = test_df.loc[:, test_df.columns == 'HomeTeamWins']
-    # print(df.head())
+    X_test = test_df.loc[:, test_df.columns != "HomeTeamWins"]
+    y_test = test_df.loc[:, test_df.columns == "HomeTeamWins"]
 
     train_cont = X_train.select_dtypes(exclude="category")
     # train_cat = X_train.select_dtypes(include="category")
 
-    # make table and graphs for train_cont and train_cat
-
     #################################################
-    # CONT/CONT TABLE
+    # OUTPUT TABLE
     #################################################
 
     # defining table
-    cont_cont_output_table = pd.DataFrame(
+    output_table = pd.DataFrame(
         columns=[
             "Predictors",
             "Pearson's R",
@@ -113,17 +119,17 @@ def main():
     layout = go.Layout(
         title_text=title,
         title_x=0.5,
-        width=900,
-        height=600,
+        width=1300,
+        height=900,
         xaxis_showgrid=False,
         yaxis_showgrid=False,
         yaxis_autorange="reversed",
     )
 
-    cont_cont_heat = go.Figure(data=[heat], layout=layout)
+    heat = go.Figure(data=[heat], layout=layout)
 
     # writing to html
-    cont_cont_heat.write_html("graphs/continuous_predictors_heatmap.html")
+    heat.write_html("graphs/continuous_predictors_heatmap.html")
 
     # extracting correlation values
     mask = np.tril(np.ones_like(pearson_corr, dtype=bool))
@@ -155,9 +161,9 @@ def main():
     abs_pearson = [item for sublist in whole_list for item in sublist]
 
     # adding variables to cont/cont output table
-    cont_cont_output_table["Predictors"] = col_combos
-    cont_cont_output_table["Pearson's R"] = pearsons_r
-    cont_cont_output_table["Absolute Value of Pearson"] = abs_pearson
+    output_table["Predictors"] = col_combos
+    output_table["Pearson's R"] = pearsons_r
+    output_table["Absolute Value of Pearson"] = abs_pearson
 
     # Linear regression for each cont/cont predictors
     lm_l = []
@@ -173,7 +179,7 @@ def main():
         for column_x in train_cont:
             for column_y in train_cont:
                 if (
-                    cont_cont_output_table["Predictors"]
+                    output_table["Predictors"]
                     .str.contains(f"{column_x}/{column_y}")
                     .any()
                 ):
@@ -190,21 +196,21 @@ def main():
                     )
                     lm.write_html(f"graphs/{column_x}__{column_y}_lm.html")
 
-    cont_cont_output_table["Linear Regression Plot"] = lm_l
+    output_table["Linear Regression Plot"] = lm_l
 
     #################################################
     # CONT/CONT BRUTE FORCE TABLE
     #################################################
-    cont_cont_brute_force = pd.DataFrame(
+    brute_force = pd.DataFrame(
         columns=[
             "Predictor 1",
             "Predictor 2",
         ]
     )
     # getting list of predictor pairs
-    cont_cont_brute_force[["Predictor 1", "Predictor 2"]] = cont_cont_output_table[
-        "Predictors"
-    ].str.split("/", expand=True)
+    brute_force[["Predictor 1", "Predictor 2"]] = output_table["Predictors"].str.split(
+        "/", expand=True
+    )
 
     # mse df
     mse_df = pd.DataFrame()
@@ -260,42 +266,103 @@ def main():
 
     # joining brute force and mse dataframes
     # merging on pred 1
-    cont_cont_brute_force = cont_cont_brute_force.merge(
-        mse_df, left_on="Predictor 1", right_on="predictor"
-    )
-    cont_cont_brute_force = cont_cont_brute_force.drop(["predictor"], axis=1)
-    cont_cont_brute_force = cont_cont_brute_force.rename(
+    brute_force = brute_force.merge(mse_df, left_on="Predictor 1", right_on="predictor")
+    brute_force = brute_force.drop(["predictor"], axis=1)
+    brute_force = brute_force.rename(
         columns={"mse": "mse_1", "weighted_mse": "weighted_mse_1"}
     )
 
     # mergin on pred 2
-    cont_cont_brute_force = cont_cont_brute_force.merge(
-        mse_df, left_on="Predictor 2", right_on="predictor"
-    )
-    cont_cont_brute_force = cont_cont_brute_force.drop(["predictor"], axis=1)
-    cont_cont_brute_force = cont_cont_brute_force.rename(
+    brute_force = brute_force.merge(mse_df, left_on="Predictor 2", right_on="predictor")
+    brute_force = brute_force.drop(["predictor"], axis=1)
+    brute_force = brute_force.rename(
         columns={"mse": "mse_2", "weighted_mse": "weighted_mse_2"}
     )
 
     # calculating actual mse, wmse
-    cont_cont_brute_force["mse"] = (
-        cont_cont_brute_force["mse_1"] * cont_cont_brute_force["mse_2"]
+    brute_force["mse"] = brute_force["mse_1"] * brute_force["mse_2"]
+    brute_force["weighted_mse"] = (
+        brute_force["weighted_mse_1"] * brute_force["weighted_mse_2"]
     )
-    cont_cont_brute_force["weighted_mse"] = (
-        cont_cont_brute_force["weighted_mse_1"]
-        * cont_cont_brute_force["weighted_mse_2"]
-    )
-    cont_cont_brute_force = cont_cont_brute_force.drop(
+    brute_force = brute_force.drop(
         ["mse_1", "mse_2", "weighted_mse_1", "weighted_mse_2"], axis=1
     )
 
     # correlation of predictors
-    cont_cont_brute_force["pearson"] = pearsons_r
-    cont_cont_brute_force["abs_pearson"] = abs_pearson
+    brute_force["pearson"] = pearsons_r
+    brute_force["abs_pearson"] = abs_pearson
+
+    ##################################################
+    # MODELS
+    ##################################################
+
+    # Decision tree
+    clf = tree.DecisionTreeClassifier()
+    clf = clf.fit(X_train, y_train)
+    tree.plot_tree(clf)
+
+    dot_data = tree.export_graphviz(
+        clf,
+        out_file=None,
+        feature_names=X_train.columns,
+        filled=True,
+        rounded=True,
+        special_characters=True,
+    )
+    graph = graphviz.Source(dot_data)
+    graph.render("decision_tree")
+
+    # making a model pipeline
+    model_pipeline = []
+    model_pipeline.append(LogisticRegression(solver="liblinear"))
+    model_pipeline.append(SVC())
+    model_pipeline.append(KNeighborsClassifier())
+    model_pipeline.append(tree.DecisionTreeClassifier())
+    model_pipeline.append(RandomForestClassifier())
+    model_pipeline.append(GaussianNB())
+
+    model_list = [
+        "Logistic Regression",
+        "SVM",
+        "KNN",
+        "Decision Tree",
+        "Random Forest",
+        "Naive Bayes",
+    ]
+    acc_list = []
+    auc_list = []
+    cm_list = []
+
+    for model in model_pipeline:
+        model.fit(X_train, y_train)
+        y_pred = model.predict(X_test)
+        acc_list.append(metrics.accuracy_score(y_test, y_pred))
+        fpr, tpr, _thresholds = metrics.roc_curve(y_test, y_pred)
+        auc_list.append(round(metrics.auc(fpr, tpr), 2))
+        cm_list.append(confusion_matrix(y_test, y_pred))
+
+    # comparing models
+    results_df = pd.DataFrame(
+        {
+            "Model": model_list,
+            "Accuracy": acc_list,
+            "AUC": auc_list,
+        }
+    )
 
     ##################################################
     # TABLE TO HTML
-    #################################################
+    ##################################################
+    with open("baseball.html", "w") as _file:
+        _file.write(
+            output_table.to_html(escape=False)
+            + "\n\n"
+            + heat.to_html()
+            + "\n\n"
+            + brute_force.to_html(escape=False)
+            + "\n\n"
+            + results_df.to_html(escape=False)
+        )
 
 
 if __name__ == "__main__":
