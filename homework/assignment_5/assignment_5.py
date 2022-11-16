@@ -24,62 +24,24 @@ def main():
 
     sql_engine = sqlalchemy.create_engine(connect_string)
 
+    # look into adding hometeam, awayteam and all stats on that
     query = """
         SELECT
-            EXTRACT(YEAR FROM g.local_date) AS year,
-            bc.team_id,
-            t.league,
-            t.division,
-            bs.overcast,
-            g.game_id,
-            SUM(bc.Hit)/SUM(bc.atBat) AS batting_avg,
-            SUM(bc.Strikeout)/SUM(bc.Hit) AS batting_soh,
-            SUM(bc.Home_Run)/SUM(bc.Hit) AS batting_hrh,
-            SUM(bc.atBat/bc.Home_Run) AS ab_hr,
-            SUM(bc.Walk)/SUM(bc.Strikeout) AS bb_k,
-            CASE
-                WHEN SUM(pc.pitchesThrown) = 0 THEN 0
-                ELSE SUM(pc.Hit)/SUM(pc.pitchesThrown)
-            END AS htt,
-            CASE
-                WHEN SUM(pc.pitchesThrown) = 0 THEN 0
-                ELSE SUM(pc.Strikeout)/SUM(pc.pitchesThrown)
-            END AS stt,
-            CASE
-                WHEN SUM(pc.Strikeout) = 0 THEN 0
-                ELSE SUM(pc.Hit)/SUM(pc.Strikeout)
-            END AS hso,
-            CASE
-                WHEN SUM(pc.endingInning-pc.startingInning) = 0 THEN 0
-                ELSE SUM(pc.Walk)+SUM(pc.Hit)/SUM(pc.endingInning-pc.startingInning)
-            END AS whip,
-            CASE
-                WHEN SUM(pc.atBat+pc.Walk+pc.Hit_By_Pitch+pc.Sac_Fly) = 0 THEN 0
-                ELSE SUM(pc.Hit+pc.Walk+pc.Hit_By_Pitch)/SUM(pc.atBat+pc.Walk+pc.Hit_By_Pitch+pc.Sac_Fly)
-            END AS obp,
-            SUM(pc.Strikeout)/SUM(pc.Walk) as k_bb,
-            CASE
-                WHEN tr.home_away = 'H' AND tr.win_lose = 'W' THEN 1
-                ELSE 0
-            END AS HomeTeamWins
+            *
         FROM
-            batter_counts bc
-        JOIN game g
-        ON g.game_id = bc.game_id
-        JOIN pitcher_counts pc
-        ON pc.game_id = g.game_id
-        JOIN team_results tr
-        ON tr.game_id = g.game_id
-        JOIN team t
-        ON t.team_id = tr.team_id
-        JOIN boxscore bs
-        ON bs.game_id = g.game_id
-        GROUP BY
-            year, bc.team_id, g.game_id
-        ORDER BY
-            year, bc.team_id DESC
+            baseball_feats;
     """
     df = pd.read_sql_query(query, sql_engine)
+
+    # creating more features (if negative, away team is higher)
+    df["better_batting"] = df["home_batting_avg"] - df["away_batting_avg"]
+    df["better_soh"] = df["home_soh"] - df["away_soh"]
+    df["better_hrh"] = df["home_hrh"] - df["away_hrh"]
+    df["better_bb_k"] = df["home_bb_k"] - df["away_bb_k"]
+    df["better_hso"] = df["home_hso"] - df["away_hso"]
+    df["better_k_bb"] = df["home_k_bb"] - df["away_k_bb"]
+    df["better_obp"] = df["home_obp"] - df["away_obp"]
+    print(df.head())
 
     # dropping useless column(s), maybe drop team_id??
     df = df.drop(["game_id"], axis=1)
@@ -88,18 +50,14 @@ def main():
     df = df.astype(
         {
             "year": "category",
-            "team_id": "category",
-            "league": "category",
-            "division": "category",
-            "overcast": "category",
         }
     )
 
     # TRAIN TEST SPLIT
-    train_df = df[df["year"] != 2011]
+    train_df = df[df["year"] != 2012]
 
     # test will be last year available
-    # test_df = df[df['year'] == 2011]
+    # test_df = df[df['year'] == 2012]
 
     X_train = train_df.loc[:, train_df.columns != "HomeTeamWins"]
     # y_train = train_df.loc[:, train_df.columns == 'HomeTeamWins']
@@ -164,10 +122,8 @@ def main():
 
     cont_cont_heat = go.Figure(data=[heat], layout=layout)
 
-    # display heatmap
-    cont_cont_heat.show()
-
     # writing to html
+    cont_cont_heat.write_html("graphs/continuous_predictors_heatmap.html")
 
     # extracting correlation values
     mask = np.tril(np.ones_like(pearson_corr, dtype=bool))
@@ -221,7 +177,7 @@ def main():
                     .str.contains(f"{column_x}/{column_y}")
                     .any()
                 ):
-                    lm_l.append("linear model")
+                    lm_l.append(f"{column_x}__{column_y}_lm")
                     lm = px.scatter(train_cont, x=column_x, y=column_y, trendline="ols")
                     results = px.get_trendline_results(lm)
                     # results = results.iloc[0]["px_fit_results"].summary()
@@ -232,6 +188,7 @@ def main():
                     lm.update_layout(
                         title=f"{column_x}/{column_y}: (t-value={t_val} p-value={p_val})",
                     )
+                    lm.write_html(f"graphs/{column_x}__{column_y}_lm.html")
 
     cont_cont_output_table["Linear Regression Plot"] = lm_l
 
@@ -286,8 +243,8 @@ def main():
 
         # plots for each predictor
         temp_df["bin"] = temp_df["bin"].astype("str")  # need to convert to str to plot
-        fig = px.bar(temp_df, x="bin", y="bin_count", title=column)
-        fig.show()
+        binplot = px.bar(temp_df, x="bin", y="bin_count", title=column)
+        binplot.write_html(f"graphs/{column}_binplot.html")
 
         # making an MSE df to use in brute force
 
@@ -335,6 +292,10 @@ def main():
     # correlation of predictors
     cont_cont_brute_force["pearson"] = pearsons_r
     cont_cont_brute_force["abs_pearson"] = abs_pearson
+
+    ##################################################
+    # TABLE TO HTML
+    #################################################
 
 
 if __name__ == "__main__":
