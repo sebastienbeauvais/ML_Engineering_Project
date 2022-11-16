@@ -249,9 +249,14 @@ def main():
         "Predictors"
     ].str.split("/", expand=True)
 
+    # mse df
+    mse_df = pd.DataFrame()
+    l1 = []  # need lists to store data for later
+    l2 = []
+    l3 = []
+
     # getting sample mean, pop_mean for each predictor
     for column in train_cont:
-        print(column)
         temp_df = pd.DataFrame()  # initialize df to store calcs
         temp_df[column] = train_cont[column]  # take col of interest for calcs
         sample_mean = temp_df[column].mean()  # get mean of col
@@ -283,6 +288,53 @@ def main():
         temp_df["bin"] = temp_df["bin"].astype("str")  # need to convert to str to plot
         fig = px.bar(temp_df, x="bin", y="bin_count", title=column)
         fig.show()
+
+        # making an MSE df to use in brute force
+
+        pred_name = train_cont[column].name
+        l1.append(pred_name)
+        l2.append(temp_df["diff_mean_resp"].mean())
+        l3.append(temp_df["weighted_diff"].mean())
+
+    # predictors and mse, wmse
+    mse_df["predictor"] = l1
+    mse_df["mse"] = l2
+    mse_df["weighted_mse"] = l3
+
+    # joining brute force and mse dataframes
+    # merging on pred 1
+    cont_cont_brute_force = cont_cont_brute_force.merge(
+        mse_df, left_on="Predictor 1", right_on="predictor"
+    )
+    cont_cont_brute_force = cont_cont_brute_force.drop(["predictor"], axis=1)
+    cont_cont_brute_force = cont_cont_brute_force.rename(
+        columns={"mse": "mse_1", "weighted_mse": "weighted_mse_1"}
+    )
+
+    # mergin on pred 2
+    cont_cont_brute_force = cont_cont_brute_force.merge(
+        mse_df, left_on="Predictor 2", right_on="predictor"
+    )
+    cont_cont_brute_force = cont_cont_brute_force.drop(["predictor"], axis=1)
+    cont_cont_brute_force = cont_cont_brute_force.rename(
+        columns={"mse": "mse_2", "weighted_mse": "weighted_mse_2"}
+    )
+
+    # calculating actual mse, wmse
+    cont_cont_brute_force["mse"] = (
+        cont_cont_brute_force["mse_1"] * cont_cont_brute_force["mse_2"]
+    )
+    cont_cont_brute_force["weighted_mse"] = (
+        cont_cont_brute_force["weighted_mse_1"]
+        * cont_cont_brute_force["weighted_mse_2"]
+    )
+    cont_cont_brute_force = cont_cont_brute_force.drop(
+        ["mse_1", "mse_2", "weighted_mse_1", "weighted_mse_2"], axis=1
+    )
+
+    # correlation of predictors
+    cont_cont_brute_force["pearson"] = pearsons_r
+    cont_cont_brute_force["abs_pearson"] = abs_pearson
 
 
 if __name__ == "__main__":
