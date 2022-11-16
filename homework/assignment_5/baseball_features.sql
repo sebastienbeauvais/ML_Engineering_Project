@@ -8,333 +8,197 @@ show columns from pitcher_counts;
 show columns from pitchersInGame;
 
 #####################################################################
-# Historical Batting Average
+# HOME TEAM WINS
 #####################################################################
-CREATE TEMPORARY TABLE temp_stats
+CREATE OR REPLACE TABLE home_team_wins
 SELECT
-	bc.batter, SUM(bc.Hit) AS total_hits,
-	SUM(bc.atBat) AS total_atBat
-FROM
-	batter_counts bc
-JOIN
-	game g
-ON
-	g.game_id = bc.game_id
-GROUP BY
-	bc.batter;
-
-CREATE TABLE hist_bat_avg (batter INT, total_hits INT, hist_batting_avg FLOAT(4,3)) ENGINE=MyISAM
-SELECT *,
-CASE
-	WHEN ts.total_atBat = 0
-	THEN 0
-	ELSE (ts.total_hits/ts.total_atBat)
-END AS hist_batting_avg
-FROM
-	temp_stats ts
-GROUP BY
-	ts.batter;
-
-#####################################################################
-# Yearly Batting Average
-#####################################################################
-CREATE TEMPORARY TABLE temp_year
-SELECT DISTINCT bc.batter, EXTRACT(YEAR FROM g.local_date) AS year,
-	SUM(bc.Hit) OVER (PARTITION BY bc.batter, year) AS total_hits,
-	SUM(bc.atBat) OVER(PARTITION BY bc.batter, year) AS total_atBats
-FROM
-	game g
-JOIN batter_counts bc
-ON g.game_id = bc.game_id;
-
-CREATE TABLE yearly_bat_avg (year YEAR, total_hits INT, total_atBats INT, yearly_batting_avg FLOAT(4,3)) ENGINE=MyISAM
-SELECT *,
-CASE
-	WHEN total_atBats = 0
-	THEN 0
-	ELSE (total_hits/total_atBats)
-END AS yearly_batting_avg
-FROM temp_year;
-
-#####################################################################
-# Rolling average of game and last 100 days
-#####################################################################
-CREATE TEMPORARY TABLE temp_rolling
-SELECT g.game_id,
-	SUM(bc.Hit) AS total_hits, SUM(bc.atBat) AS total_atBats,
-	(SUM(bc.Hit)/SUM(bc.atBat)) AS overall_batting_avg,
-	DATE(g.local_date) AS ora_date
-FROM
-	batter_counts bc
-JOIN
-	game g
-ON
-	g.game_id = bc.game_id
-GROUP BY
-	g.game_id
-ORDER BY
-	g.game_id DESC
-;
-
-CREATE TABLE overall_rolling_avg ENGINE=MEMORY
-SELECT *,
-	AVG(overall_batting_avg) OVER (ORDER BY game_id, ora_date ROWS BETWEEN
-	100 PRECEDING AND 1 PRECEDING) AS rolling_avg
-FROM temp_rolling
-;
-
-#####################################################################
-# 1: K-BB% - strikeout per walks percentage
-#####################################################################
-SELECT
-    player_id,
-    team_id,
-    career_so,
-    career_bb,
-    (career_so/career_bb) AS K_BB_PER
-FROM
-    pitcher_stat
-WHERE
-    career_so > 0
-GROUP BY
-    player_id, team_id
-ORDER BY
-    K_BB_PER ASC;
-
-#####################################################################
-# 2: BB/K% - Walk to strikeout ratio
-#####################################################################
-SELECT
-    player_id,
-    team_id,
-    career_so,
-    career_bb,
-    (career_bb/career_so) AS BB_K_RATIO
-FROM
-    pitcher_stat
-WHERE
-    career_so > 0
-GROUP BY
-    player_id, team_id
-ORDER BY
-    BB_K_RATIO ASC;
-
-#####################################################################
-# 3: WHIP - walks+hits/innings pitched
-#####################################################################
-CREATE TEMPORARY TABLE temp_pitcher_whip
-SELECT
-    pitcher,
-    team_id,
-    game_id,
-    Hit,
-    Walk,
-    (endingInning-startingInning) AS innings_played
-FROM
-    pitcher_counts
-ORDER BY
-    innings_played DESC, pitcher;
-
-SELECT
-    pitcher,
-    SUM(Hit) AS total_hit,
-    SUM(Walk) AS total_walk,
-    SUM(innings_played) AS total_inning,
-    (SUM(Walk)+SUM(Hit)/SUM(innings_played)) AS whip
-FROM
-    temp_pitcher_whip
-GROUP BY
-    pitcher
-LIMIT
-    0,20;
-
--- same query without using a temp table
-SELECT
-    pitcher,
-    SUM(Hit) AS total_hit,
-    SUM(Walk) AS total_walk,
-    SUM(endingInning-startingInning) AS total_inning,
-    (SUM(Walk)+SUM(Hit)/SUM(endingInning-startingInning)) AS whip
-FROM
-    pitcher_counts
-GROUP BY
-    pitcher
-LIMIT
-    0,20;
-
-#####################################################################
-# 4: Hits to strikeout ratio
-#####################################################################
-CREATE TEMPORARY TABLE temp_pitcher_hso
-SELECT
-    pitcher,
-    team_id,
-    game_id,
-    Hit,
-    Strikeout,
-    pitchesThrown
-FROM
-    pitcher_counts
-ORDER BY
-    pitcher;
-
-SELECT
-    pitcher,
-    SUM(Hit) AS total_hit,
-    SUM(Strikeout) AS total_so,
-    SUM(pitchesThrown) AS total_thrown,
-    (SUM(Hit)/SUM(Strikeout)) AS hso
-FROM
-    temp_pitcher_hso
-GROUP BY
-    pitcher
-LIMIT
-    0,20;
-
-#####################################################################
-# 5,6: strikeouts and hits to total throws
-#####################################################################
-SELECT
-    pitcher,
-    SUM(Hit) AS total_hit,
-    SUM(Strikeout) AS total_so,
-    SUM(pitchesThrown) AS total_thrown,
-    (SUM(Hit)/SUM(pitchesThrown)) AS htt,
-    (SUM(Strikeout)/SUM(pitchesThrown)) AS stt
-FROM
-    temp_pitcher_hso
-GROUP BY
-    pitcher
-LIMIT
-    0,20;
-
-#####################################################################
-# 7: top 100 pitchers by WHIP based on over 100 innings played
-#####################################################################
-CREATE TEMPORARY TABLE temp_innings
-SELECT
-    pitcher,
-    SUM(Hit) AS total_hit,
-    SUM(Walk) AS total_walk,
-    SUM(innings_played) AS total_inning,
+    EXTRACT(YEAR FROM g.local_date) AS year,
+    tr.game_id,
+    tr.team_id,
     CASE
-	    WHEN innings_played = 0
-	THEN
-	    0
-	ELSE
-	    (SUM(Walk)+SUM(Hit)/SUM(innings_played))
-END AS whip
+        WHEN tr.home_away = 'H' AND tr.win_lose = 'W' THEN 1
+        ELSE 0
+    END AS HomeTeamWins
 FROM
-    temp_pitcher_whip
-GROUP BY
-    pitcher;
-
-SELECT
-    *
-FROM
-    temp_innings
-WHERE
-    total_inning >= 100
-ORDER BY
-    whip DESC
-LIMIT
-    0,100;
-
-#####################################################################
-# 8: Homeruns per hits
-#####################################################################
-CREATE TEMPORARY TABLE batting_hrh
-SELECT
-    batter,
-    SUM(Hit) AS total_hit,
-    SUM(Home_Run) AS total_hr,
-	(SUM(Home_Run)/SUM(Hit)) AS batting_hrh
-FROM
-    batter_counts
-GROUP BY
-    batter;
-
-#####################################################################
-# 9: Strikeouts per hits
-#####################################################################
-CREATE TEMPORARY TABLE batting_soh
-SELECT
-    batter,
-    SUM(Hit) AS total_hit,
-    SUM(Strikeout) AS total_so,
-	(SUM(Strikeout)/SUM(Hit)) AS batting_soh
-FROM
-    batter_counts
-GROUP BY
-    batter;
-
-#####################################################################
-# 10: Strikeouts to pitches thrown
-#####################################################################
-CREATE TEMPORARY TABLE pitcher_sot
-SELECT
-    pitcher,
-    SUM(pitchesThrown) AS total_throw,
-    SUM(Strikeout) AS total_so,
-	(SUM(Strikeout)/SUM(pitchesThrown)) AS pitcher_sot
-FROM
-    pitcher_counts
-GROUP BY
-    pitcher;
-
-#####################################################################
-# Table with all features (what will be run in python)
-#####################################################################
-CREATE OF MODIFY TABLE baseball_features
-SELECT
-	EXTRACT(YEAR FROM g.local_date) AS year,
-	bc.team_id,
-	g.game_id,
-	SUM(bc.Hit)/SUM(bc.atBat) AS batting_avg,
-	SUM(bc.Strikeout)/SUM(bc.Hit) AS batting_soh,
-	SUM(bc.Home_Run)/SUM(bc.Hit) AS batting_hrh,
-	SUM(bc.atBat/bc.Home_Run) AS ab_hr,
-	SUM(bc.Walk)/SUM(bc.Strikeout) AS bb_k,
-	CASE
-		WHEN SUM(pc.pitchesThrown) = 0 THEN 0
-		ELSE SUM(pc.Hit)/SUM(pc.pitchesThrown)
-	END AS htt,
-	CASE
-		WHEN SUM(pc.pitchesThrown) = 0 THEN 0
-		ELSE SUM(pc.Strikeout)/SUM(pc.pitchesThrown)
-	END AS stt,
-	CASE
-		WHEN SUM(pc.Strikeout) = 0 THEN 0
-		ELSE SUM(pc.Hit)/SUM(pc.Strikeout)
-	END AS hso,
-	CASE
-		WHEN SUM(pc.endingInning-pc.startingInning) = 0 THEN 0
-		ELSE SUM(pc.Walk)+SUM(pc.Hit)/SUM(pc.endingInning-pc.startingInning)
-	END AS whip,
-	CASE
-		WHEN SUM(pc.atBat+pc.Walk+pc.Hit_By_Pitch+pc.Sac_Fly) = 0 THEN 0
-		ELSE SUM(pc.Hit+pc.Walk+pc.Hit_By_Pitch)/SUM(pc.atBat+pc.Walk+pc.Hit_By_Pitch+pc.Sac_Fly)
-	END AS obp,
-	SUM(pc.Strikeout)/SUM(pc.Walk) as k_bb,
-	CASE
-		WHEN tr.home_away = 'H' AND tr.win_lose = 'W' THEN 1
-		ELSE 0
-	END AS HomeTeamWins
-FROM
-	batter_counts bc
+    team_results tr
 JOIN game g
-ON g.game_id = bc.game_id
-JOIN pitcher_counts pc
-ON pc.game_id = g.game_id
-JOIN team_results tr
-ON tr.game_id = g.game_id
+ON g.home_team_id = tr.team_id
+GROUP BY g.game_id;
+
+#####################################################################
+# GETTING HOME TEAM BATTING STATS
+#####################################################################
+CREATE OR REPLACE TABLE home_batting_stats
+SELECT
+    EXTRACT(YEAR FROM g.local_date) AS year,
+    g.game_id,
+    g.home_team_id AS home_team,
+    CASE
+        WHEN tbc.atBat = 0 THEN 0
+        ELSE tbc.Hit/tbc.atBat
+    END AS home_batting_avg,
+    CASE
+        WHEN tbc.Hit = 0 THEN 0
+        ELSE tbc.Strikeout/tbc.Hit
+    END AS home_soh,
+    CASE
+        WHEN tbc.Hit = 0 THEN 0
+        ELSE tbc.Home_Run/tbc.Hit
+    END AS home_hrh,
+    CASE
+        WHEN tbc.Strikeout = 0 THEN 0
+        ELSE tbc.Walk/tbc.Strikeout
+    END AS home_bb_k
+FROM
+    game g
+JOIN team_batting_counts tbc
+ON tbc.team_id = g.home_team_id
 GROUP BY
-	year, bc.team_id, g.game_id
+    g.game_id
 ORDER BY
-	year, bc.team_id DESC
-LIMIT 0,20;
+    g.game_id, g.home_team_id DESC;
 
+#####################################################################
+# GETTING HOME TEAM PITCHING STATS
+#####################################################################
+CREATE OR REPLACE TABLE home_pitching_stats
+SELECT
+    EXTRACT(YEAR FROM g.local_date) AS year,
+    g.game_id,
+    g.home_team_id AS home_team,
+    CASE
+        WHEN tpc.Strikeout = 0 THEN 0
+        ELSE tpc.Hit/tpc.Strikeout
+    END AS home_hso,
+    CASE
+        WHEN tpc.Walk = 0 THEN 0
+        ELSE tpc.Strikeout/tpc.Walk
+    END AS home_k_bb,
+    CASE
+        WHEN (tpc.atBat+tpc.Walk+tpc.Hit_By_Pitch+tpc.Sac_Fly) = 0 THEN 0
+        ELSE (tpc.Hit+tpc.Walk+tpc.Hit_By_Pitch)/(tpc.atBat+tpc.Walk+tpc.Hit_By_Pitch+tpc.Sac_Fly)
+    END AS home_obp
+FROM
+    game g
+JOIN team_pitching_counts tpc
+ON tpc.team_id = g.home_team_id
+GROUP BY
+    g.game_id
+ORDER BY
+    g.game_id, g.home_team_id DESC;
 
+#####################################################################
+# GETTING AWAY TEAM STATS
+#####################################################################
+CREATE OR REPLACE TABLE away_batting_stats
+SELECT
+    EXTRACT(YEAR FROM g.local_date) AS year,
+    g.game_id,
+    g.away_team_id AS away_team,
+    CASE
+        WHEN tbc.atBat = 0 THEN 0
+        ELSE tbc.Hit/tbc.atBat
+    END AS away_batting_avg,
+    CASE
+        WHEN tbc.Hit = 0 THEN 0
+        ELSE tbc.Strikeout/tbc.Hit
+    END AS away_soh,
+    CASE
+        WHEN tbc.Hit = 0 THEN 0
+        ELSE tbc.Home_Run/tbc.Hit
+    END AS away_hrh,
+    CASE
+        WHEN tbc.Strikeout = 0 THEN 0
+        ELSE tbc.Walk/tbc.Strikeout
+    END AS away_bb_k
+FROM
+    game g
+JOIN team_batting_counts tbc
+ON tbc.team_id = g.away_team_id
+GROUP BY
+    g.game_id
+ORDER BY
+    g.game_id, g.away_team_id DESC;
+
+#####################################################################
+# GETTING AWAY TEAM PITCHING STATS
+#####################################################################
+CREATE OR REPLACE TABLE away_pitching_stats
+SELECT
+    EXTRACT(YEAR FROM g.local_date) AS year,
+    g.game_id,
+    g.away_team_id AS away_team,
+    CASE
+        WHEN tpc.Strikeout = 0 THEN 0
+        ELSE tpc.Hit/tpc.Strikeout
+    END AS away_hso,
+    CASE
+        WHEN tpc.Walk = 0 THEN 0
+        ELSE tpc.Strikeout/tpc.Walk
+    END AS away_k_bb,
+    CASE
+        WHEN (tpc.atBat+tpc.Walk+tpc.Hit_By_Pitch+tpc.Sac_Fly) = 0 THEN 0
+        ELSE (tpc.Hit+tpc.Walk+tpc.Hit_By_Pitch)/(tpc.atBat+tpc.Walk+tpc.Hit_By_Pitch+tpc.Sac_Fly)
+    END AS away_obp
+FROM
+    game g
+JOIN team_pitching_counts tpc
+ON tpc.team_id = g.away_team_id
+GROUP BY
+    g.game_id
+ORDER BY
+    g.game_id, g.away_team_id DESC;
+
+#####################################################################
+# HOME TEAM STATS
+#####################################################################
+CREATE OR REPLACE TABLE home_team_stats
+SELECT
+    hbs.*,
+    hps.home_hso,
+    hps.home_k_bb,
+    hps.home_obp
+FROM
+    home_batting_stats hbs
+LEFT JOIN home_pitching_stats hps
+ON hbs.game_id = hps.game_id;
+
+#####################################################################
+# AWAY TEAM STATS
+#####################################################################
+CREATE OR REPLACE TABLE away_team_stats
+SELECT
+    abs.*,
+    aps.away_hso,
+    aps.away_k_bb,
+    aps.away_obp
+FROM
+    away_batting_stats abs
+LEFT JOIN away_pitching_stats aps
+ON abs.game_id = aps.game_id;
+
+#####################################################################
+# FINAL QUERY
+#####################################################################
+CREATE OR REPLACE TABLE baseball_feats
+SELECT
+    hts.*,
+    ats.away_team,
+    ats.away_batting_avg,
+    ats.away_soh,
+    ats.away_hrh,
+    ats.away_bb_k,
+    ats.away_hso,
+    ats.away_k_bb,
+    ats.away_obp,
+    htw.HomeTeamWins
+FROM
+    home_team_stats hts
+LEFT JOIN away_team_stats ats
+ON hts.game_id = ats.game_id
+LEFT JOIN home_team_wins htw
+ON htw.team_id = hts.home_team
+GROUP BY hts.game_id;
 
 
 
