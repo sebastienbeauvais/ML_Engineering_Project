@@ -15,7 +15,11 @@ from sklearn.naive_bayes import GaussianNB
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.svm import SVC
 
-# from sklearn.model_selection import train_test_split_
+
+# make links clickable
+def make_clickable(val):
+    name, url = val.split("#")
+    return f'<a target="_blank" href="{url}">{name}</a>'
 
 
 def main():
@@ -167,14 +171,14 @@ def main():
 
     # Linear regression for each cont/cont predictors
     lm_l = []
-    """names = []
+    names = []
     urls = []
     links_df = pd.DataFrame(
         columns=[
             "name",
             "url",
         ]
-    )"""
+    )
     if len(train_cont.axes[1]) >= 2:
         for column_x in train_cont:
             for column_y in train_cont:
@@ -194,9 +198,19 @@ def main():
                     lm.update_layout(
                         title=f"{column_x}/{column_y}: (t-value={t_val} p-value={p_val})",
                     )
-                    lm.write_html(f"graphs/{column_x}__{column_y}_lm.html")
+                    lm.write_html(f"graphs/{column_x}*{column_y}_lm.html")
 
-    output_table["Linear Regression Plot"] = lm_l
+                    # add links
+                    names.append(f"{column_x}*{column_y}_linear_model")
+                    urls.append(f"graphs/{column_x}*{column_y}_lm.html")
+
+    links_df["name"] = names
+    links_df["url"] = urls
+    links_df["name_url"] = links_df["name"] + "#" + links_df["url"]
+
+    output_table["Linear Regression Plot"] = links_df["name_url"]
+
+    # output_table["Linear Regression Plot"] = lm_l
 
     #################################################
     # CONT/CONT BRUTE FORCE TABLE
@@ -353,15 +367,43 @@ def main():
     ##################################################
     # TABLE TO HTML
     ##################################################
-    with open("baseball.html", "w") as _file:
-        _file.write(
-            output_table.to_html(escape=False)
+    # formatting for html out
+    html_string = """
+    <html>
+      <head><title>HTML Pandas Dataframe with CSS</title></head>
+      <link rel="stylesheet" type="text/css" href="my_style.css"/>
+      <body>
+        {table}
+      </body>
+    </html>.
+    """
+    # OUTPUT HTML FILE
+    with open("test.html", "w") as f:
+        f.write(
+            html_string.format(
+                table=output_table.to_html(justify="center", classes="mystyle")
+            )
             + "\n\n"
             + heat.to_html()
             + "\n\n"
-            + brute_force.to_html(escape=False)
+            + html_string.format(
+                table=brute_force.to_html(justify="center", classes="mystyle")
+            )
             + "\n\n"
-            + results_df.to_html(escape=False)
+            + html_string.format(
+                table=results_df.to_html(justify="center", classes="mystyle")
+            )
+        )
+
+    with open("baseball.html", "w") as _file:
+        _file.write(
+            output_table.to_html(justify="center", escape=False)
+            + "\n\n"
+            + heat.to_html()
+            + "\n\n"
+            + brute_force.to_html(justify="center", escape=False)
+            + "\n\n"
+            + results_df.to_html(justify="center", escape=False)
         )
 
 
