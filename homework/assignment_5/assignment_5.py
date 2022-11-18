@@ -1,5 +1,6 @@
 import itertools
 import sys
+import warnings
 
 import graphviz
 import numpy as np
@@ -23,6 +24,8 @@ def make_clickable(val):
 
 
 def main():
+    warnings.simplefilter(action="ignore", category=FutureWarning)
+
     # CONNECTING TO DB
     db_user = "root"
     # pragma: allowlist nextline secret
@@ -210,8 +213,6 @@ def main():
 
     output_table["Linear Regression Plot"] = links_df["name_url"]
 
-    # output_table["Linear Regression Plot"] = lm_l
-
     #################################################
     # CONT/CONT BRUTE FORCE TABLE
     #################################################
@@ -221,6 +222,7 @@ def main():
             "Predictor 2",
         ]
     )
+
     # getting list of predictor pairs
     brute_force[["Predictor 1", "Predictor 2"]] = output_table["Predictors"].str.split(
         "/", expand=True
@@ -231,6 +233,11 @@ def main():
     l1 = []  # need lists to store data for later
     l2 = []
     l3 = []
+
+    graphs_df = pd.DataFrame()
+    joiner = []
+    names = []
+    urls = []
 
     # getting sample mean, pop_mean for each predictor
     for column in train_cont:
@@ -266,7 +273,10 @@ def main():
         binplot = px.bar(temp_df, x="bin", y="bin_count", title=column)
         binplot.write_html(f"graphs/{column}_binplot.html")
 
-        # making an MSE df to use in brute force
+        # getting links
+        joiner.append(f"{column}")
+        names.append(f"{column}_binplot")
+        urls.append(f"graphs/{column}_binplot.html")
 
         pred_name = train_cont[column].name
         l1.append(pred_name)
@@ -278,6 +288,12 @@ def main():
     mse_df["mse"] = l2
     mse_df["weighted_mse"] = l3
 
+    # making graphs df to merge with actual
+    graphs_df["joiner"] = joiner
+    graphs_df["name"] = names
+    graphs_df["url"] = urls
+    graphs_df["name_url"] = graphs_df["name"] + "#" + graphs_df["url"]
+
     # joining brute force and mse dataframes
     # merging on pred 1
     brute_force = brute_force.merge(mse_df, left_on="Predictor 1", right_on="predictor")
@@ -286,7 +302,7 @@ def main():
         columns={"mse": "mse_1", "weighted_mse": "weighted_mse_1"}
     )
 
-    # mergin on pred 2
+    # merging on pred 2
     brute_force = brute_force.merge(mse_df, left_on="Predictor 2", right_on="predictor")
     brute_force = brute_force.drop(["predictor"], axis=1)
     brute_force = brute_force.rename(
@@ -294,8 +310,10 @@ def main():
     )
 
     # calculating actual mse, wmse
-    brute_force["mse"] = brute_force["mse_1"] * brute_force["mse_2"]
-    brute_force["weighted_mse"] = (
+    brute_force["Difference of Mean Response"] = (
+        brute_force["mse_1"] * brute_force["mse_2"]
+    )
+    brute_force["Weighted Difference of Mean Response"] = (
         brute_force["weighted_mse_1"] * brute_force["weighted_mse_2"]
     )
     brute_force = brute_force.drop(
@@ -303,8 +321,16 @@ def main():
     )
 
     # correlation of predictors
-    brute_force["pearson"] = pearsons_r
-    brute_force["abs_pearson"] = abs_pearson
+    brute_force["Pearson"] = pearsons_r
+    brute_force["Absolute Pearson"] = abs_pearson
+
+    # merging graphs_df on actual to link graphs
+    brute_force = brute_force.merge(graphs_df, left_on="Predictor 1", right_on="joiner")
+    brute_force = brute_force.drop(columns={"joiner", "name", "url"})
+    brute_force = brute_force.rename(columns={"name_url": "Predictor 1 Bin Plot"})
+    brute_force = brute_force.merge(graphs_df, left_on="Predictor 2", right_on="joiner")
+    brute_force = brute_force.drop(columns={"joiner", "name", "url"})
+    brute_force = brute_force.rename(columns={"name_url": "Predictor 2 Bin Plot"})
 
     ##################################################
     # MODELS
@@ -377,11 +403,34 @@ def main():
       </body>
     </html>.
     """
+    # sorting values
+    brute_force = brute_force.sort_values(
+        by=["Weighted Difference of Mean Response"], ascending=False
+    )
+
+    output_table = (
+        output_table.style.set_properties(**{"text-align": "center"})
+        .format({"Linear Regression Plot": make_clickable})
+        .hide_index()
+    )
+    brute_force = (
+        brute_force.style.set_properties(**{"text-align": "center"})
+        .format(
+            {
+                "Predictor 1 Bin Plot": make_clickable,
+                "Predictor 2 Bin Plot": make_clickable,
+            }
+        )
+        .hide_index()
+    )
+
     # OUTPUT HTML FILE
     with open("test.html", "w") as f:
         f.write(
             html_string.format(
-                table=output_table.to_html(justify="center", classes="mystyle")
+                table=output_table.to_html(
+                    justify="center", col_space=10, classes="mystyle"
+                )
             )
             + "\n\n"
             + heat.to_html()
