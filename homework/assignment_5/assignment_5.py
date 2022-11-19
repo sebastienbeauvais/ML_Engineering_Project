@@ -389,7 +389,6 @@ def main():
             "AUC": auc_list,
         }
     )
-    print("print")
 
     """
     Best model is Random Forest based on accuracy of prediction. Most likely over-fit due to the accuracy being 1.
