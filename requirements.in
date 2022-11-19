@@ -8,3 +8,6 @@ statsmodels
 pydot
 scipy
 seaborn
+mariadb
+sqlalchemy
+graphviz
