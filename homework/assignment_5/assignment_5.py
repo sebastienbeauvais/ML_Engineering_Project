@@ -389,6 +389,14 @@ def main():
             "AUC": auc_list,
         }
     )
+    print("print")
+
+    """
+    Best model is Random Forest based on accuracy of prediction. Most likely over-fit due to the accuracy being 1.
+    Second best is Decision Tree with .99 accuracy followed by KNN at .98. Both probably over-fit...
+    Going off non over-fit models logistic regression actually performs the best at .78
+    Curious as to why RF and DT could be so overfit? I did not think that I had included predictors that 'cheated'
+    """
 
     ##################################################
     # TABLE TO HTML
@@ -396,7 +404,7 @@ def main():
     # formatting for html out
     html_string = """
     <html>
-      <head><title>HTML Pandas Dataframe with CSS</title></head>
+      <head><title>Assignment 5 Output</title></head>
       <link rel="stylesheet" type="text/css" href="my_style.css"/>
       <body>
         {table}
@@ -407,7 +415,9 @@ def main():
     brute_force = brute_force.sort_values(
         by=["Weighted Difference of Mean Response"], ascending=False
     )
+    results_df = results_df.sort_values(by=["Accuracy"], ascending=False)
 
+    # creating clickable links
     output_table = (
         output_table.style.set_properties(**{"text-align": "center"})
         .format({"Linear Regression Plot": make_clickable})
@@ -425,7 +435,7 @@ def main():
     )
 
     # OUTPUT HTML FILE
-    with open("test.html", "w") as f:
+    with open("assignment_5.html", "w") as f:
         f.write(
             html_string.format(
                 table=output_table.to_html(
@@ -442,17 +452,6 @@ def main():
             + html_string.format(
                 table=results_df.to_html(justify="center", classes="mystyle")
             )
-        )
-
-    with open("baseball.html", "w") as _file:
-        _file.write(
-            output_table.to_html(justify="center", escape=False)
-            + "\n\n"
-            + heat.to_html()
-            + "\n\n"
-            + brute_force.to_html(justify="center", escape=False)
-            + "\n\n"
-            + results_df.to_html(justify="center", escape=False)
         )
 
 
