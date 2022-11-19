@@ -1,13 +1,4 @@
-#####################################################################
-# Select database
-#####################################################################
-USE baseball;
-SHOW tables FROM baseball;
-show columns from pitcher_stat;
-show columns from pitcher_counts;
-show columns from pitchersInGame;
-
-#####################################################################
+####################################################################
 # HOME TEAM WINS
 #####################################################################
 CREATE OR REPLACE TABLE home_team_wins
