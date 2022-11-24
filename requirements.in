@@ -4,3 +4,7 @@ pandas
 sklearn
 pyspark
 pyspark-stubs
+statsmodels
+pydot
+scipy
+seaborn
