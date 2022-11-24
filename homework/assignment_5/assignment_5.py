@@ -1,4 +1,5 @@
 import itertools
+import os
 import sys
 import warnings
 
@@ -57,7 +58,7 @@ def main():
     df["better_obp"] = df["home_obp"] - df["away_obp"]
 
     # dropping useless column(s)
-    df = df.drop(["game_id"], axis=1)
+    df = df.drop(["game_id", "home_team", "away_team"], axis=1)
 
     # making year a category
     df = df.astype(
@@ -83,6 +84,18 @@ def main():
 
     train_cont = X_train.select_dtypes(exclude="category")
     # train_cat = X_train.select_dtypes(include="category")
+
+    # creating directory for graphs
+    dir = "graphs"
+    # parent dir
+    parent_dir = os.getcwd()
+    # path
+    path = os.path.join(parent_dir, dir)
+    try:
+        os.makedirs(path, exist_ok=True)
+        print("Directory '%s' created successfully" % dir)
+    except OSError as error:
+        print("Directory '%s' cannot be created" % dir, error)
 
     #################################################
     # OUTPUT TABLE
@@ -331,6 +344,12 @@ def main():
     brute_force = brute_force.merge(graphs_df, left_on="Predictor 2", right_on="joiner")
     brute_force = brute_force.drop(columns={"joiner", "name", "url"})
     brute_force = brute_force.rename(columns={"name_url": "Predictor 2 Bin Plot"})
+
+    # add random forest variable importance
+
+    # add t-score and p-val
+
+    # add 2d hist on predictors pairs
 
     ##################################################
     # MODELS
