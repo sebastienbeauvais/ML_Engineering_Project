@@ -9,8 +9,9 @@ import pandas as pd
 import plotly.express as px
 import plotly.graph_objs as go
 import sqlalchemy
+from plotly.subplots import make_subplots
 from sklearn import metrics, tree
-from sklearn.ensemble import RandomForestClassifier
+from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import confusion_matrix
 from sklearn.naive_bayes import GaussianNB
@@ -280,10 +281,41 @@ def main():
         temp_df["weighted_diff"] = temp_df["diff_mean_resp"].multiply(
             temp_df["population_proportion"]
         )  # wmse
+        print(temp_df.head())
 
         # plots for each predictor
         temp_df["bin"] = temp_df["bin"].astype("str")  # need to convert to str to plot
-        binplot = px.bar(temp_df, x="bin", y="bin_count", title=column)
+
+        binplot = make_subplots(specs=[[{"secondary_y": True}]])
+
+        binplot.add_trace(
+            go.Bar(x=temp_df["bin"], y=temp_df["bin_count"], name="Population"),
+            secondary_y=False,
+        )
+        binplot.add_trace(
+            go.Scatter(
+                x=temp_df["bin"], y=temp_df["sample_mean"], name="Upop", mode="lines"
+            ),
+            secondary_y=True,
+        )
+        binplot.add_trace(
+            go.Scatter(
+                x=temp_df["bin"],
+                y=temp_df["diff_mean_resp"],
+                name="Ui-Upop",
+                mode="lines",
+            ),
+            secondary_y=True,
+        )
+        """fig.add_trace(
+            go.Scatter(x=temp_df['bin'], y=temp_df['weighted_diff'], name="W Ui-Upop", mode="lines"),
+            secondary_y=True
+        )"""
+        binplot.update_xaxes(title_text="Bins")
+
+        binplot.update_yaxes(title_text="Population", secondary_y=False)
+        binplot.update_yaxes(title_text="Response", secondary_y=True)
+
         binplot.write_html(f"graphs/{column}_binplot.html")
 
         # getting links
@@ -346,6 +378,18 @@ def main():
     brute_force = brute_force.rename(columns={"name_url": "Predictor 2 Bin Plot"})
 
     # add random forest variable importance
+    rf = RandomForestRegressor(n_estimators=100)
+    rf.fit(X_train, y_train)
+
+    # base RF
+    feat_bar = px.bar(
+        x=rf.feature_importances_,
+        y=X_train.columns,
+        labels=dict(x="Feature Importance", y="Feature Name"),
+        orientation="h",
+        title="feature importance",
+    )
+    feat_bar.show()
 
     # add t-score and p-val
 
