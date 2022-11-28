@@ -1,4 +1,5 @@
 import itertools
+import os
 import sys
 import warnings
 
@@ -8,8 +9,9 @@ import pandas as pd
 import plotly.express as px
 import plotly.graph_objs as go
 import sqlalchemy
+from plotly.subplots import make_subplots
 from sklearn import metrics, tree
-from sklearn.ensemble import RandomForestClassifier
+from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import confusion_matrix
 from sklearn.naive_bayes import GaussianNB
@@ -57,7 +59,7 @@ def main():
     df["better_obp"] = df["home_obp"] - df["away_obp"]
 
     # dropping useless column(s)
-    df = df.drop(["game_id"], axis=1)
+    df = df.drop(["game_id", "home_team", "away_team"], axis=1)
 
     # making year a category
     df = df.astype(
@@ -83,6 +85,18 @@ def main():
 
     train_cont = X_train.select_dtypes(exclude="category")
     # train_cat = X_train.select_dtypes(include="category")
+
+    # creating directory for graphs
+    dir = "graphs"
+    # parent dir
+    parent_dir = os.getcwd()
+    # path
+    path = os.path.join(parent_dir, dir)
+    try:
+        os.makedirs(path, exist_ok=True)
+        print("Directory '%s' created successfully" % dir)
+    except OSError as error:
+        print("Directory '%s' cannot be created" % dir, error)
 
     #################################################
     # OUTPUT TABLE
@@ -270,7 +284,37 @@ def main():
 
         # plots for each predictor
         temp_df["bin"] = temp_df["bin"].astype("str")  # need to convert to str to plot
-        binplot = px.bar(temp_df, x="bin", y="bin_count", title=column)
+
+        binplot = make_subplots(specs=[[{"secondary_y": True}]])
+
+        binplot.add_trace(
+            go.Bar(x=temp_df["bin"], y=temp_df["bin_count"], name="Population"),
+            secondary_y=False,
+        )
+        binplot.add_trace(
+            go.Scatter(
+                x=temp_df["bin"], y=temp_df["sample_mean"], name="Upop", mode="lines"
+            ),
+            secondary_y=True,
+        )
+        binplot.add_trace(
+            go.Scatter(
+                x=temp_df["bin"],
+                y=temp_df["diff_mean_resp"],
+                name="Ui-Upop",
+                mode="lines",
+            ),
+            secondary_y=True,
+        )
+        """fig.add_trace(
+            go.Scatter(x=temp_df['bin'], y=temp_df['weighted_diff'], name="W Ui-Upop", mode="lines"),
+            secondary_y=True
+        )"""
+        binplot.update_xaxes(title_text="Bins")
+
+        binplot.update_yaxes(title_text="Population", secondary_y=False)
+        binplot.update_yaxes(title_text="Response", secondary_y=True)
+
         binplot.write_html(f"graphs/{column}_binplot.html")
 
         # getting links
@@ -331,6 +375,24 @@ def main():
     brute_force = brute_force.merge(graphs_df, left_on="Predictor 2", right_on="joiner")
     brute_force = brute_force.drop(columns={"joiner", "name", "url"})
     brute_force = brute_force.rename(columns={"name_url": "Predictor 2 Bin Plot"})
+
+    # add random forest variable importance
+    rf = RandomForestRegressor(n_estimators=100)
+    rf.fit(X_train, y_train)
+
+    # base RF
+    feat_bar = px.bar(
+        x=rf.feature_importances_,
+        y=X_train.columns,
+        labels=dict(x="Feature Importance", y="Feature Name"),
+        orientation="h",
+        title="Random Forest Feature Importance",
+    )
+    feat_bar.write_html("graphs/random_forest_classifier.html")
+
+    # add t-score and p-val
+
+    # add 2d hist on predictors pairs
 
     ##################################################
     # MODELS
@@ -447,6 +509,8 @@ def main():
             + html_string.format(
                 table=brute_force.to_html(justify="center", classes="mystyle")
             )
+            + "\n\n"
+            + feat_bar.to_html()
             + "\n\n"
             + html_string.format(
                 table=results_df.to_html(justify="center", classes="mystyle")
