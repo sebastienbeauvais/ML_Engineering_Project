@@ -281,7 +281,6 @@ def main():
         temp_df["weighted_diff"] = temp_df["diff_mean_resp"].multiply(
             temp_df["population_proportion"]
         )  # wmse
-        print(temp_df.head())
 
         # plots for each predictor
         temp_df["bin"] = temp_df["bin"].astype("str")  # need to convert to str to plot
@@ -387,9 +386,9 @@ def main():
         y=X_train.columns,
         labels=dict(x="Feature Importance", y="Feature Name"),
         orientation="h",
-        title="feature importance",
+        title="Random Forest Feature Importance",
     )
-    feat_bar.show()
+    feat_bar.write_html("graphs/random_forest_classifier.html")
 
     # add t-score and p-val
 
@@ -510,6 +509,8 @@ def main():
             + html_string.format(
                 table=brute_force.to_html(justify="center", classes="mystyle")
             )
+            + "\n\n"
+            + feat_bar.to_html()
             + "\n\n"
             + html_string.format(
                 table=results_df.to_html(justify="center", classes="mystyle")
