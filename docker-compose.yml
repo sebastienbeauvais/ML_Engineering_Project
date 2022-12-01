@@ -1,28 +1,30 @@
 version: "3.3"
 
 services:
-  mariadb3:
+  mariadb:
     image: lscr.io/linuxserver/mariadb:latest
-    container_name: mariadb3
+    container_name: mariadb
     environment:
       - PUID=501
       - PGID=20
       - MYSQL_ROOT_PASSWORD=password
+      - MYSQL_DATABASE=baseball
       - TZ=Europe/London
 
     volumes:
-      - ./.db:/config
+      - ./.db:/test_env
+      # - ./init:/docker-entrypoint-initdb.d
     ports:
-      - 5306:3306
+      - 3030:3030
     restart: unless-stopped
 
-  baseball:
+  test:
     build:
       context: .
       dockerfile: Dockerfile
-    image: baseball
+    image: test
     environment:
       PORT: "8080"
     restart: unless-stopped
     volumes:
-      - "./stuff:/app/stuff"
+      - "./stuff:/test_env"
