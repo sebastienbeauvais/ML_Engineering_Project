@@ -1,9 +1,14 @@
 USE baseball;
 
-CREATE OR REPLACE TEMPORARY TABLE temp_rolling
+CREATE TEMPORARY TABLE IF NOT EXISTS temp_rolling
 SELECT g.game_id,
-	SUM(bc.Hit) AS total_hits, SUM(bc.atBat) AS total_atBats,
-	(SUM(bc.Hit)/SUM(bc.atBat)) AS overall_batting_avg,
+    bc.batter,
+	SUM(bc.Hit) AS total_hits,
+	SUM(bc.atBat) AS total_atBats,
+	CASE
+	    WHEN SUM(bc.atBat) = 0 THEN 0
+	    ELSE (SUM(bc.Hit)/SUM(bc.atBat))
+	END AS batting_avg,
 	DATE(g.local_date) AS ora_date
 FROM
 	batter_counts bc
@@ -12,14 +17,50 @@ JOIN
 ON
 	g.game_id = bc.game_id
 GROUP BY
-	g.game_id
+	bc.batter, g.game_id
 ORDER BY
-	g.game_id DESC
+	g.game_id, bc.batter DESC
 ;
 
-CREATE OR REPLACE TABLE overall_rolling_avg
+CREATE OR REPLACE TABLE rolling_avg
 SELECT *,
-	AVG(overall_batting_avg) OVER (ORDER BY game_id, ora_date ROWS BETWEEN
+	AVG(batting_avg) OVER (PARTITION BY batter ORDER BY game_id, ora_date ROWS BETWEEN
 	100 PRECEDING AND 1 PRECEDING) AS rolling_avg
 FROM temp_rolling
 ;
+
+-- 100 rolling per player // NOT WORKING
+-- SELECT *,
+--    CASE WHEN
+--        ROW_NUMBER() OVER (ORDER BY ora_date) >=1 THEN
+--            SUM(total_hits) OVER (PARTITION BY batter ORDER BY game_id, ora_date ROWS BETWEEN 100 PRECEDING AND 1 PRECEDING)
+--    ELSE 0
+--    END AS rol_avg
+--FROM temp_rolling
+--WHERE game_id=12560;
+
+
+CREATE TEMPORARY TABLE IF NOT EXISTS temp_batter_avg
+SELECT
+    b.game_id AS game_id,
+    DATE(local_date) AS game_date,
+    batter,
+    Hit,
+    atBat
+FROM
+    batter_counts b
+JOIN game g
+ON b.game_id = g.game_id;
+
+-- USING CODE FROM SLIDES LECTURE 12 (ASSIGNMENT 6, 2/4)
+CREATE OR REPLACE TABLE game_rolling_avg
+SELECT
+    game_id,
+    game_date,
+    batter,
+    (SELECT SUM(Hit)/SUM(atBat)
+        FROM temp_batter_avg brat3
+        WHERE brat3.game_date > DATE_ADD(bra1.game_date, INTERVAL - 100 DAY) AND
+            brat3.game_date < bra1.game_date AND bra1.batter = brat3.batter) AS last_100_days_rolling_avg
+FROM temp_batter_avg bra1
+WHERE game_id = 12560;

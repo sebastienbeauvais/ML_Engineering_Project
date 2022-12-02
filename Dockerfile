@@ -21,18 +21,11 @@ RUN pip install --upgrade pip
 RUN pip install mariadb
 RUN pip3 install --compile --no-cache-dir -r requirements.txt
 
-# Copy file to load database
-COPY baseball.sql baseball.sql
+# Copy files
+COPY assignment_6.sql assignment_6.sql
+COPY bashfile.sh bashfile.sh
 
 # SQL - making baseball db
-RUN wget teaching.mrsharky.com/data/baseball.sql.tar.gz
-RUN tar -xvzf baseball.sql.tar.gz
-CMD mariadb -u root -ppassword -e "CREATE DATABASE IF NOT EXIST baseball"
-CMD mysql -u root -ppassword baseball < baseball.sql
+CMD ./bashfile.sh
 
-#CMD mariadb -u root -ppassword -h maridb -e "SHOW DATABASES;" > "my_file"
-
-# docker exec <> mysql -u root -ppassword -h mariadb -e "SHOW DATABASES;"
-
-# docker exec -i mariadb mysql -uroot -ppassword baseball < baseball.sql;
 
