@@ -22,6 +22,6 @@ services:
     image: baseball
     environment:
       PORT: "8080"
-    restart: always
+    restart: on-failure
     volumes:
       - "./baseball.sql:/app/baseball.sql"

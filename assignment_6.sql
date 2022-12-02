@@ -22,23 +22,12 @@ ORDER BY
 	g.game_id, bc.batter DESC
 ;
 
-CREATE OR REPLACE TABLE rolling_avg
+CREATE OR REPLACE TABLE 100_day_rolling_avg
 SELECT *,
 	AVG(batting_avg) OVER (PARTITION BY batter ORDER BY game_id, ora_date ROWS BETWEEN
-	100 PRECEDING AND 1 PRECEDING) AS rolling_avg
+	100 PRECEDING AND 1 PRECEDING) AS 100_day_rolling_avg
 FROM temp_rolling
 ;
-
--- 100 rolling per player // NOT WORKING
--- SELECT *,
---    CASE WHEN
---        ROW_NUMBER() OVER (ORDER BY ora_date) >=1 THEN
---            SUM(total_hits) OVER (PARTITION BY batter ORDER BY game_id, ora_date ROWS BETWEEN 100 PRECEDING AND 1 PRECEDING)
---    ELSE 0
---    END AS rol_avg
---FROM temp_rolling
---WHERE game_id=12560;
-
 
 CREATE TEMPORARY TABLE IF NOT EXISTS temp_batter_avg
 SELECT
@@ -53,7 +42,7 @@ JOIN game g
 ON b.game_id = g.game_id;
 
 -- USING CODE FROM SLIDES LECTURE 12 (ASSIGNMENT 6, 2/4)
-CREATE OR REPLACE TABLE game_rolling_avg
+CREATE OR REPLACE TABLE batter_rolling_avg
 SELECT
     game_id,
     game_date,
