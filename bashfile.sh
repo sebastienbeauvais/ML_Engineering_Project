@@ -19,5 +19,7 @@ fi
 
 # making table
 echo "Creating output assignment 6..."
-mysql -u root -ppassword -h mariadb baseball < assignment_6.sql > output.txt
+mysql -u root -ppassword -h mariadb baseball < assignment_6.sql > ./output.txt
+mysql -u root -ppassword -h mariadb baseball < 12560_rolling.sql > ./12560_output.txt
+mysql -u root -ppassword -h mariadb baseball < 100_day_rolling.sql > ./100_day_rolling_output.txt
 echo "Finished output"

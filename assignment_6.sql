@@ -19,13 +19,14 @@ ON
 GROUP BY
 	bc.batter, g.game_id
 ORDER BY
-	g.game_id, bc.batter DESC
+	bc.batter, ora_date DESC
 ;
 
-CREATE OR REPLACE TABLE 100_day_rolling_avg
+-- this takes
+CREATE OR REPLACE TABLE _100_day_rolling_avg
 SELECT *,
-	AVG(batting_avg) OVER (PARTITION BY batter ORDER BY game_id, ora_date ROWS BETWEEN
-	100 PRECEDING AND 1 PRECEDING) AS 100_day_rolling_avg
+	AVG(batting_avg) OVER (PARTITION BY batter ORDER BY game_id RANGE BETWEEN
+	100 PRECEDING AND CURRENT ROW) AS _100_day_rolling_avg
 FROM temp_rolling
 ;
 
@@ -53,3 +54,6 @@ SELECT
             brat3.game_date < bra1.game_date AND bra1.batter = brat3.batter) AS last_100_days_rolling_avg
 FROM temp_batter_avg bra1
 WHERE game_id = 12560;
+
+-- SELECT * FROM _100_day_rolling_avg INTO OUTFILE '100_day_rolling.txt';
+-- SELECT * FROM batter_rolling_avg INTO OUTFILE '12560_output.txt';
