@@ -174,7 +174,6 @@ ON abs.game_id = aps.game_id;
 CREATE OR REPLACE TABLE baseball_feats
 SELECT
     hts.*,
-    ats.away_team,
     ats.away_batting_avg,
     ats.away_soh,
     ats.away_hrh,
@@ -182,26 +181,34 @@ SELECT
     ats.away_hso,
     ats.away_k_bb,
     ats.away_obp,
-    AVG(hts.home_batting_avg) OVER (PARTITION BY hts.home_team ORDER BY game_id RANGE BETWEEN
-	10 PRECEDING AND CURRENT ROW) AS home_10_day_batting_avg,
-	AVG(hts.home_batting_avg) OVER (PARTITION BY hts.home_team ORDER BY game_id RANGE BETWEEN
-	25 PRECEDING AND CURRENT ROW) AS home_25_day_batting_avg,
-	AVG(hts.home_batting_avg) OVER (PARTITION BY hts.home_team ORDER BY game_id RANGE BETWEEN
-	50 PRECEDING AND CURRENT ROW) AS home_50_day_batting_avg,
 	AVG(hts.home_batting_avg) OVER (PARTITION BY hts.home_team ORDER BY game_id RANGE BETWEEN
 	100 PRECEDING AND CURRENT ROW) AS home_100_day_batting_avg,
+	AVG(hts.home_soh) OVER (PARTITION BY hts.home_team ORDER BY game_id RANGE BETWEEN
+	100 PRECEDING AND CURRENT ROW) AS home_100_soh_avg,
+	AVG(hts.home_hrh) OVER (PARTITION BY hts.home_team ORDER BY game_id RANGE BETWEEN
+	100 PRECEDING AND CURRENT ROW) AS home_100_day_hrh_avg,
+	AVG(hts.home_bb_k) OVER (PARTITION BY hts.home_team ORDER BY game_id RANGE BETWEEN
+	100 PRECEDING AND CURRENT ROW) AS home_100_day_bb_k_avg,
+	AVG(hts.home_hso) OVER (PARTITION BY hts.home_team ORDER BY game_id RANGE BETWEEN
+	100 PRECEDING AND CURRENT ROW) AS home_100_day_hso_avg,
 	AVG(hts.home_k_bb) OVER (PARTITION BY hts.home_team ORDER BY game_id RANGE BETWEEN
 	100 PRECEDING AND CURRENT ROW) AS home_100_day_k_bb_avg,
-	AVG(ats.away_batting_avg) OVER (PARTITION BY ats.away_team ORDER BY game_id RANGE BETWEEN
-	10 PRECEDING AND CURRENT ROW) AS away_10_day_batting_avg,
-	AVG(ats.away_batting_avg) OVER (PARTITION BY ats.away_team ORDER BY game_id RANGE BETWEEN
-	25 PRECEDING AND CURRENT ROW) AS away_25_day_batting_avg,
-	AVG(ats.away_batting_avg) OVER (PARTITION BY ats.away_team ORDER BY game_id RANGE BETWEEN
-	50 PRECEDING AND CURRENT ROW) AS away_50_day_batting_avg,
+	AVG(hts.home_obp) OVER (PARTITION BY hts.home_team ORDER BY game_id RANGE BETWEEN
+	100 PRECEDING AND CURRENT ROW) AS home_100_day_obp_avg,
 	AVG(ats.away_batting_avg) OVER (PARTITION BY ats.away_team ORDER BY game_id RANGE BETWEEN
 	100 PRECEDING AND CURRENT ROW) AS away_100_day_batting_avg,
+	AVG(ats.away_soh) OVER (PARTITION BY ats.away_team ORDER BY game_id RANGE BETWEEN
+	100 PRECEDING AND CURRENT ROW) AS away_100_soh_avg,
+	AVG(ats.away_hrh) OVER (PARTITION BY ats.away_team ORDER BY game_id RANGE BETWEEN
+	100 PRECEDING AND CURRENT ROW) AS away_100_day_hrh_avg,
+	AVG(ats.away_bb_k) OVER (PARTITION BY ats.away_team ORDER BY game_id RANGE BETWEEN
+	100 PRECEDING AND CURRENT ROW) AS away_100_day_bb_k_avg,
+	AVG(ats.away_hso) OVER (PARTITION BY ats.away_team ORDER BY game_id RANGE BETWEEN
+	100 PRECEDING AND CURRENT ROW) AS away_100_day_hso_avg,
 	AVG(ats.away_k_bb) OVER (PARTITION BY ats.away_team ORDER BY game_id RANGE BETWEEN
 	100 PRECEDING AND CURRENT ROW) AS away_100_day_k_bb_avg,
+	AVG(ats.away_obp) OVER (PARTITION BY ats.away_team ORDER BY game_id RANGE BETWEEN
+	100 PRECEDING AND CURRENT ROW) AS away_100_day_obp_avg,
     htw.HomeTeamWins
 FROM
     home_team_stats hts
@@ -214,29 +221,20 @@ GROUP BY hts.game_id;
 CREATE OR REPLACE TABLE more_baseball_feats
 SELECT
     year,
-    home_k_bb,
-    home_hso,
-    away_k_bb,
-    away_hso,
-    home_10_day_batting_avg,
-    home_25_day_batting_avg,
-    home_50_day_batting_avg,
-    home_100_day_batting_avg,
-    home_100_day_k_bb_avg,
-    away_10_day_batting_avg,
-    away_25_day_batting_avg,
-    away_50_day_batting_avg,
-    away_100_day_batting_avg,
-    away_100_day_k_bb_avg,
-    (home_batting_avg - away_batting_avg) AS comp_batting_avg,
-    (home_soh - away_soh) AS comp_soh,
-    (home_hrh - away_hrh) AS comp_hrh,
-    (home_bb_k - away_bb_k) AS comp_bb_k,
-    (home_hso - away_hso) AS comp_hso,
-    (home_k_bb - away_k_bb) AS comp_k_bb,
-    (home_obp - away_obp) AS comp_obp,
-    (home_10_day_batting_avg - away_10_day_batting_avg) AS comp_10_day_batting_avg,
+    (home_batting_avg - away_batting_avg) AS batting_avg,
+    (home_soh - away_soh) AS soh,
+    (home_hrh - away_hrh) AS hrh,
+    (home_bb_k - away_bb_k) AS bb_k,
+    (home_hso - away_hso) AS hso,
+    (home_k_bb - away_k_bb) AS k_bb,
+    (home_obp - away_obp) AS obp,
+    (home_100_day_batting_avg - away_100_day_batting_avg) AS comp_100_day_batting_avg,
+    (home_100_soh_avg - away_100_soh_avg) AS comp_100_day_soh_avg,
+    (home_100_day_hrh_avg - away_100_day_hrh_avg) AS comp_100_day_hrh_avg,
+    (home_100_day_bb_k_avg - away_100_day_bb_k_avg) AS comp_100_day_bb_k_avg,
+    (home_100_day_hso_avg - away_100_day_hso_avg) AS comp_100_day_hso_avg,
     (home_100_day_k_bb_avg - away_100_day_k_bb_avg) AS comp_100_day_k_bb_avg,
+    (home_100_day_obp_avg - away_100_day_obp_avg) AS comp_100_day_obp_avg,
     HomeTeamWins
 FROM
     baseball_feats;

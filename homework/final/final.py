@@ -50,14 +50,13 @@ def main():
     df = pd.read_sql_query(query, sql_engine)
 
     # dropping useless column(s)
-    df = df.drop(["home_hso", "home_k_bb", "away_hso", "away_k_bb"], axis=1)
+    # df = df.drop(["home_hso", "home_k_bb", "away_hso", "away_k_bb", "comp_obp", "comp_k_bb",
+    #              "comp_hso", "comp_bb_k", "comp_hrh", "comp_soh", "comp_batting_avg",
+    #              "home_100_day_k_bb_avg", "home_100_day_batting_avg", "home_10_day_batting_avg",
+    #              "home_25_day_batting_avg", "home_50_day_batting_avg"], axis=1)
 
     # making year a category
-    df = df.astype(
-        {
-            "year": "category",
-        }
-    )
+    df = df.astype({"year": "category", "HomeTeamWins": "category"})
     # filling nan
     df["HomeTeamWins"] = df["HomeTeamWins"].fillna(0)
 
@@ -92,6 +91,85 @@ def main():
     #################################################
     # OUTPUT TABLE
     #################################################
+
+    # cont predictors
+    cont_predictors_table = pd.DataFrame(columns=["Predictor", "Violin Plot"])
+    predictor_l = []
+    violin_l = []
+    names = []
+    urls = []
+    links_df = pd.DataFrame(
+        columns=[
+            "name",
+            "url",
+        ]
+    )
+    train_holder = train_df.loc[:, train_df.columns != "year"]
+
+    for column in train_holder:
+        predictor_l.append(column)
+        violin = px.violin(
+            train_holder,
+            y=train_holder[column],
+            x=train_holder["HomeTeamWins"],
+            color="HomeTeamWins",
+            box=True,
+        )
+        violin_l.append(f"{column}_violin_plot")
+        violin.write_html(f"graphs/{column}_violin_plot.html")
+
+        # add links
+        names.append(f"{column}_violin_plot")
+        urls.append(f"graphs/{column}_violin_plot.html")
+
+    cont_predictors_table["Predictor"] = predictor_l
+
+    links_df["name"] = names
+    links_df["url"] = urls
+    links_df["name_url"] = links_df["name"] + "#" + links_df["url"]
+    cont_predictors_table["Violin Plot"] = links_df["name_url"]
+
+    cont_predictors_table = cont_predictors_table.drop(
+        cont_predictors_table.tail(1).index
+    )
+
+    # cat predictors
+    cat_predictors_table = pd.DataFrame(columns=["Predictor", "Comp Plot"])
+    predictor_l = []
+    comp_l = []
+    names = []
+    urls = []
+    links_df = pd.DataFrame(
+        columns=[
+            "name",
+            "url",
+        ]
+    )
+    train_holder = train_df.select_dtypes(include="category")
+
+    for column in train_holder:
+        predictor_l.append(column)
+        density = px.density_heatmap(
+            train_holder,
+            y=train_holder[column],
+            x=train_holder["HomeTeamWins"],
+            color_continuous_scale="RdBu",
+        )
+        comp_l.append(f"{column}_comp_plot")
+        density.write_html(f"graphs/{column}_comp_plot.html")
+
+        # add links
+        names.append(f"{column}_comp_plot")
+        urls.append(f"graphs/{column}_comp_plot.html")
+
+    cat_predictors_table["Predictor"] = predictor_l
+
+    links_df["name"] = names
+    links_df["url"] = urls
+    links_df["name_url"] = links_df["name"] + "#" + links_df["url"]
+    cat_predictors_table["Comp Plot"] = links_df["name_url"]
+
+    cat_predictors_table = cat_predictors_table.drop(cat_predictors_table.tail(1).index)
 
     # defining table
     output_table = pd.DataFrame(
@@ -187,6 +265,8 @@ def main():
             "url",
         ]
     )
+    t_list = []
+    p_list = []
     if len(train_cont.axes[1]) >= 2:
         for column_x in train_cont:
             for column_y in train_cont:
@@ -212,10 +292,15 @@ def main():
                     names.append(f"{column_x}*{column_y}_linear_model")
                     urls.append(f"graphs/{column_x}*{column_y}_lm.html")
 
+                    t_list.append(t_val)
+                    p_list.append(p_val)
+
     links_df["name"] = names
     links_df["url"] = urls
     links_df["name_url"] = links_df["name"] + "#" + links_df["url"]
 
+    output_table["t-value"] = t_list
+    output_table["p-score"] = p_list
     output_table["Linear Regression Plot"] = links_df["name_url"]
 
     #################################################
@@ -297,12 +382,7 @@ def main():
             ),
             secondary_y=True,
         )
-        """fig.add_trace(
-            go.Scatter(x=temp_df['bin'], y=temp_df['weighted_diff'], name="W Ui-Upop", mode="lines"),
-            secondary_y=True
-        )"""
         binplot.update_xaxes(title_text="Bins")
-
         binplot.update_yaxes(title_text="Population", secondary_y=False)
         binplot.update_yaxes(title_text="Response", secondary_y=True)
 
@@ -366,6 +446,65 @@ def main():
     brute_force = brute_force.merge(graphs_df, left_on="Predictor 2", right_on="joiner")
     brute_force = brute_force.drop(columns={"joiner", "name", "url"})
     brute_force = brute_force.rename(columns={"name_url": "Predictor 2 Bin Plot"})
+
+    # creating 2D histograms for each pair
+    for column_1 in train_cont:
+        temp_df = pd.DataFrame()  # initialize df to store calcs
+        temp_df[column_1] = train_cont[column_1]  # take col of interest for calcs
+        temp_df["bin"] = pd.cut(
+            train_cont[column_1], 10, right=True
+        )  # separate into 10 bins
+        temp_df["bin_mean"] = temp_df.groupby("bin")[column_1].transform(
+            "mean"
+        )  # get mean of each bin
+        temp_df["bin_count"] = temp_df.groupby("bin")[column_1].transform(
+            "count"
+        )  # get count of each bin
+        temp_df = temp_df.drop(columns=[column_1])  # dropping base col to condense df
+        temp_df = temp_df.drop_duplicates().sort_values(
+            by="bin", ascending=True
+        )  # dropping dup cols
+        for column_2 in train_cont:
+            temp_df_2 = pd.DataFrame()  # initialize df to store calcs
+            temp_df_2[column_2] = train_cont[column_2]  # take col of interest for calcs
+            temp_df_2["bin"] = pd.cut(
+                train_cont[column_2], 10, right=True
+            )  # separate into 10 bins
+            temp_df_2["bin_mean"] = temp_df_2.groupby("bin")[column_2].transform(
+                "mean"
+            )  # get mean of each bin
+            temp_df_2["bin_count"] = temp_df_2.groupby("bin")[column_2].transform(
+                "count"
+            )  # get count of each bin
+            temp_df_2 = temp_df_2.drop(
+                columns=[column_2]
+            )  # dropping base col to condense df
+            temp_df_2 = temp_df_2.drop_duplicates().sort_values(
+                by="bin", ascending=True
+            )  # dropping dup cols
+
+            # output 2d histogram
+
+            temp_df["bin"] = temp_df["bin"].astype(
+                "str"
+            )  # need to convert to str to plot
+            temp_df_2["bin"] = temp_df_2["bin"].astype(
+                "str"
+            )  # need to convert to str to plot
+
+            fig = make_subplots(specs=[[{"secondary_y": True}]])
+
+            fig.add_trace(
+                go.Bar(x=temp_df["bin"], y=temp_df["bin_count"]),
+                secondary_y=False,
+            )
+            fig.add_trace(
+                go.Histogram(x=temp_df_2["bin"], y=temp_df_2["bin_count"]),
+                secondary_y=True,
+            )
+            fig.update_layout(barmode="overlay")
+            fig.update_traces(opacity=0.75)
+            # fig.show()
 
     # add random forest variable importance
     rf = RandomForestRegressor(n_estimators=100)
@@ -471,6 +610,17 @@ def main():
     results_df = results_df.sort_values(by=["Accuracy"], ascending=False)
 
     # creating clickable links
+    cat_predictors_table = (
+        cat_predictors_table.style.set_properties(**{"text=align": "center"})
+        .format({"Comp Plot": make_clickable})
+        .hide_index()
+    )
+
+    cont_predictors_table = (
+        cont_predictors_table.style.set_properties(**{"text=align": "center"})
+        .format({"Violin Plot": make_clickable})
+        .hide_index()
+    )
     output_table = (
         output_table.style.set_properties(**{"text-align": "center"})
         .format({"Linear Regression Plot": make_clickable})
@@ -491,6 +641,14 @@ def main():
     with open("final.html", "w") as f:
         f.write(
             html_string.format(
+                table=cat_predictors_table.to_html(justify="center", classes="mystyle")
+            )
+            + "\n\n"
+            + html_string.format(
+                table=cont_predictors_table.to_html(justify="center", classes="mystyle")
+            )
+            + "\n\n"
+            + html_string.format(
                 table=output_table.to_html(
                     justify="center", col_space=10, classes="mystyle"
                 )
