@@ -58,13 +58,16 @@ def main():
     # making year a category
     df = df.astype({"year": "category", "HomeTeamWins": "category"})
     # filling nan
-    df["HomeTeamWins"] = df["HomeTeamWins"].fillna(0)
+    df = df.dropna()
 
     # TRAIN TEST SPLIT
-    train_df = df[df["year"] != 2012]
+    train_df = df[df["year"] != 2011]
 
     # test will be last year available
-    test_df = df[df["year"] == 2012]
+    test_df = df[df["year"] == 2011]
+
+    train_df = train_df.drop(columns=["year"])
+    test_df = test_df.drop(columns=["year"])
 
     X_train = train_df.loc[:, train_df.columns != "HomeTeamWins"]
     y_train = train_df.loc[:, train_df.columns == "HomeTeamWins"]
@@ -448,63 +451,68 @@ def main():
     brute_force = brute_force.rename(columns={"name_url": "Predictor 2 Bin Plot"})
 
     # creating 2D histograms for each pair
-    for column_1 in train_cont:
-        temp_df = pd.DataFrame()  # initialize df to store calcs
-        temp_df[column_1] = train_cont[column_1]  # take col of interest for calcs
-        temp_df["bin"] = pd.cut(
-            train_cont[column_1], 10, right=True
+    # fig = px.density_heatmap(X_train, x="obp", y="k_bb", marginal_x="histogram", marginal_y="histogram")
+    # fig.show()
+    for column1 in train_cont:
+        temp_df1 = pd.DataFrame()  # initialize df to store calcs
+        temp_df1[column1] = train_cont[column1]  # take col of interest for calcs
+        sample_mean = temp_df1[column1].mean()  # get mean of col
+        temp_df1["bin"] = pd.cut(
+            train_cont[column1], 10, right=True
         )  # separate into 10 bins
-        temp_df["bin_mean"] = temp_df.groupby("bin")[column_1].transform(
+        temp_df1["sample_mean"] = sample_mean  # set new col to mean
+        temp_df1["bin_mean"] = temp_df1.groupby("bin")[column1].transform(
             "mean"
         )  # get mean of each bin
-        temp_df["bin_count"] = temp_df.groupby("bin")[column_1].transform(
+        temp_df1["bin_count"] = temp_df1.groupby("bin")[column1].transform(
             "count"
         )  # get count of each bin
-        temp_df = temp_df.drop(columns=[column_1])  # dropping base col to condense df
-        temp_df = temp_df.drop_duplicates().sort_values(
+        temp_df1 = temp_df1.drop(columns=[column1])  # dropping base col to condense df
+        temp_df1["diff_mean_resp"] = (
+            (temp_df1["bin_mean"] - temp_df1["sample_mean"]) ** 2
+        ) / 10  # calc mse
+        temp_df1 = temp_df1.drop_duplicates().sort_values(
             by="bin", ascending=True
         )  # dropping dup cols
-        for column_2 in train_cont:
-            temp_df_2 = pd.DataFrame()  # initialize df to store calcs
-            temp_df_2[column_2] = train_cont[column_2]  # take col of interest for calcs
-            temp_df_2["bin"] = pd.cut(
-                train_cont[column_2], 10, right=True
+        temp_df1["population_proportion"] = temp_df1["bin_count"].divide(
+            temp_df1["bin_count"].sum()
+        )  # calc pop prop
+        temp_df1["weighted_diff"] = temp_df1["diff_mean_resp"].multiply(
+            temp_df1["population_proportion"]
+        )  # wmse
+        temp_df1["match"] = np.arange(temp_df1.shape[0])
+        # print(temp_df1.head())
+        for column2 in train_cont:
+            temp_df2 = pd.DataFrame()  # initialize df to store calcs
+            temp_df2[column2] = train_cont[column2]  # take col of interest for calcs
+            sample_mean = temp_df2[column2].mean()  # get mean of col
+            temp_df2["bin2"] = pd.cut(
+                train_cont[column2], 10, right=True
             )  # separate into 10 bins
-            temp_df_2["bin_mean"] = temp_df_2.groupby("bin")[column_2].transform(
+            temp_df2["sample_mean2"] = sample_mean  # set new col to mean
+            temp_df2["bin_mean2"] = temp_df2.groupby("bin2")[column2].transform(
                 "mean"
             )  # get mean of each bin
-            temp_df_2["bin_count"] = temp_df_2.groupby("bin")[column_2].transform(
+            temp_df2["bin_count2"] = temp_df2.groupby("bin2")[column2].transform(
                 "count"
             )  # get count of each bin
-            temp_df_2 = temp_df_2.drop(
-                columns=[column_2]
+            temp_df2 = temp_df2.drop(
+                columns=[column2]
             )  # dropping base col to condense df
-            temp_df_2 = temp_df_2.drop_duplicates().sort_values(
-                by="bin", ascending=True
+            temp_df2["diff_mean_resp2"] = (
+                (temp_df2["bin_mean2"] - temp_df2["sample_mean2"]) ** 2
+            ) / 10  # calc mse
+            temp_df2 = temp_df2.drop_duplicates().sort_values(
+                by="bin2", ascending=True
             )  # dropping dup cols
-
-            # output 2d histogram
-
-            temp_df["bin"] = temp_df["bin"].astype(
-                "str"
-            )  # need to convert to str to plot
-            temp_df_2["bin"] = temp_df_2["bin"].astype(
-                "str"
-            )  # need to convert to str to plot
-
-            fig = make_subplots(specs=[[{"secondary_y": True}]])
-
-            fig.add_trace(
-                go.Bar(x=temp_df["bin"], y=temp_df["bin_count"]),
-                secondary_y=False,
-            )
-            fig.add_trace(
-                go.Histogram(x=temp_df_2["bin"], y=temp_df_2["bin_count"]),
-                secondary_y=True,
-            )
-            fig.update_layout(barmode="overlay")
-            fig.update_traces(opacity=0.75)
-            # fig.show()
+            temp_df2["population_proportion2"] = temp_df2["bin_count2"].divide(
+                temp_df2["bin_count2"].sum()
+            )  # calc pop prop
+            temp_df2["weighted_diff2"] = temp_df2["diff_mean_resp2"].multiply(
+                temp_df2["population_proportion2"]
+            )  # wmse
+            temp_df2["match2"] = np.arange(temp_df2.shape[0])
+            temp_df1 = temp_df1.merge(temp_df2, left_on="match", right_on="match2")
 
     # add random forest variable importance
     rf = RandomForestRegressor(n_estimators=100)
