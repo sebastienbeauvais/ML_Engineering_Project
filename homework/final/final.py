@@ -107,7 +107,7 @@ def main():
             "url",
         ]
     )
-    train_holder = train_df.loc[:, train_df.columns != "year"]
+    train_holder = train_df  # .loc[:, train_df.columns != "year"]
 
     for column in train_holder:
         predictor_l.append(column)
@@ -338,8 +338,8 @@ def main():
         temp_df[column] = train_cont[column]  # take col of interest for calcs
         sample_mean = temp_df[column].mean()  # get mean of col
         temp_df["bin"] = pd.cut(
-            train_cont[column], 10, right=True
-        )  # separate into 10 bins
+            train_cont[column], 7, right=True
+        )  # separate into 7 bins
         temp_df["sample_mean"] = sample_mean  # set new col to mean
         temp_df["bin_mean"] = temp_df.groupby("bin")[column].transform(
             "mean"
@@ -348,9 +348,7 @@ def main():
             "count"
         )  # get count of each bin
         temp_df = temp_df.drop(columns=[column])  # dropping base col to condense df
-        temp_df["diff_mean_resp"] = (
-            (temp_df["bin_mean"] - temp_df["sample_mean"]) ** 2
-        ) / 10  # calc mse
+        temp_df["diff_mean_resp"] = temp_df["bin_mean"] - temp_df["sample_mean"]
         temp_df = temp_df.drop_duplicates().sort_values(
             by="bin", ascending=True
         )  # dropping dup cols
