@@ -348,7 +348,10 @@ def main():
             "count"
         )  # get count of each bin
         temp_df = temp_df.drop(columns=[column])  # dropping base col to condense df
-        temp_df["diff_mean_resp"] = temp_df["bin_mean"] - temp_df["sample_mean"]
+        temp_df["diff_mean_resp"] = (
+            (temp_df["bin_mean"] - temp_df["sample_mean"]) ** 2
+        ) / 7  # calc mse
+        temp_df["graph_mse"] = temp_df["bin_mean"] - temp_df["sample_mean"]
         temp_df = temp_df.drop_duplicates().sort_values(
             by="bin", ascending=True
         )  # dropping dup cols
@@ -377,7 +380,7 @@ def main():
         binplot.add_trace(
             go.Scatter(
                 x=temp_df["bin"],
-                y=temp_df["diff_mean_resp"],
+                y=temp_df["graph_mse"],
                 name="Ui-Upop",
                 mode="lines",
             ),
@@ -451,7 +454,7 @@ def main():
     # creating 2D histograms for each pair
     # fig = px.density_heatmap(X_train, x="obp", y="k_bb", marginal_x="histogram", marginal_y="histogram")
     # fig.show()
-    for column1 in train_cont:
+    """for column1 in train_cont:
         temp_df1 = pd.DataFrame()  # initialize df to store calcs
         temp_df1[column1] = train_cont[column1]  # take col of interest for calcs
         sample_mean = temp_df1[column1].mean()  # get mean of col
@@ -510,7 +513,7 @@ def main():
                 temp_df2["population_proportion2"]
             )  # wmse
             temp_df2["match2"] = np.arange(temp_df2.shape[0])
-            temp_df1 = temp_df1.merge(temp_df2, left_on="match", right_on="match2")
+            temp_df1 = temp_df1.merge(temp_df2, left_on="match", right_on="match2")"""
 
     # add random forest variable importance
     rf = RandomForestRegressor(n_estimators=100)
