@@ -17,8 +17,8 @@ services:
 
   baseball:
     build:
-      context: .
-      dockerfile: Dockerfile
+      context: ..
+      dockerfile: ../Dockerfile
     image: baseball
     environment:
       PORT: "8080"

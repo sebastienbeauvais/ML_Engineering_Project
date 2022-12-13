@@ -49,12 +49,6 @@ def main():
     """
     df = pd.read_sql_query(query, sql_engine)
 
-    # dropping useless column(s)
-    # df = df.drop(["home_hso", "home_k_bb", "away_hso", "away_k_bb", "comp_obp", "comp_k_bb",
-    #              "comp_hso", "comp_bb_k", "comp_hrh", "comp_soh", "comp_batting_avg",
-    #              "home_100_day_k_bb_avg", "home_100_day_batting_avg", "home_10_day_batting_avg",
-    #              "home_25_day_batting_avg", "home_50_day_batting_avg"], axis=1)
-
     # making year a category
     df = df.astype({"year": "category", "HomeTeamWins": "category"})
     # filling nan
@@ -598,7 +592,138 @@ def main():
     Going off non over-fit models logistic regression actually performs the best at .78
     Curious as to why RF and DT could be so overfit? I did not think that I had included predictors that 'cheated'
     """
+    ##################################################
+    # MODELING WITHOUT HIGHLY CORR PAIRS .75 CUTOFF
+    ##################################################
+    # making a model pipeline
+    X_train2 = X_train.drop(
+        columns=[
+            "home_20_game_hit2plate_avg",
+            "home_20_game_hrh_avg",
+            "home_20_game_soh_avg",
+            "away_20_game_batting_avg",
+            "home_20_game_safe2plate_avg",
+        ]
+    )
+    X_test2 = X_test.drop(
+        columns=[
+            "home_20_game_hit2plate_avg",
+            "home_20_game_hrh_avg",
+            "home_20_game_soh_avg",
+            "away_20_game_batting_avg",
+            "home_20_game_safe2plate_avg",
+        ]
+    )
 
+    # making a model pipeline
+    model_pipeline = []
+    model_pipeline.append(LogisticRegression(solver="liblinear"))
+    model_pipeline.append(SVC())
+    model_pipeline.append(KNeighborsClassifier())
+    model_pipeline.append(tree.DecisionTreeClassifier())
+    model_pipeline.append(RandomForestClassifier())
+    model_pipeline.append(GaussianNB())
+
+    model_list = [
+        "Logistic Regression",
+        "SVM",
+        "KNN",
+        "Decision Tree",
+        "Random Forest",
+        "Naive Bayes",
+    ]
+    acc_list = []
+    auc_list = []
+    cm_list = []
+
+    for model in model_pipeline:
+        model.fit(X_train2, y_train)
+        y_pred = model.predict(X_test2)
+        acc_list.append(metrics.accuracy_score(y_test, y_pred))
+        fpr, tpr, _thresholds = metrics.roc_curve(y_test, y_pred)
+        auc_list.append(round(metrics.auc(fpr, tpr), 2))
+        cm_list.append(confusion_matrix(y_test, y_pred))
+
+    # comparing models
+    results_df2 = pd.DataFrame(
+        {
+            "Model": model_list,
+            "Accuracy": acc_list,
+            "AUC": auc_list,
+            # add ROC
+        }
+    )
+    ##################################################
+    # MODELING WITH STRONGEST PREDICTORS
+    ##################################################
+    # making a model pipeline
+    X_train3 = X_train.drop(
+        columns=[
+            "away_20_game_safe2plate_avg",
+            "away_20_game_hit2plate_avg",
+            "away_20_game_h2b_avg",
+            "away_20_game_obp_avg",
+            "away_20_game_k_bb_avg",
+            "away_20_game_hso_avg",
+            "away_20_game_bb_k_avg",
+            "away_20_game_hrh_avg",
+            "away_20_game_soh_avg",
+            "away_20_game_batting_avg",
+        ]
+    )
+    X_test3 = X_test.drop(
+        columns=[
+            "away_20_game_safe2plate_avg",
+            "away_20_game_hit2plate_avg",
+            "away_20_game_h2b_avg",
+            "away_20_game_obp_avg",
+            "away_20_game_k_bb_avg",
+            "away_20_game_hso_avg",
+            "away_20_game_bb_k_avg",
+            "away_20_game_hrh_avg",
+            "away_20_game_soh_avg",
+            "away_20_game_batting_avg",
+        ]
+    )
+
+    # making a model pipeline
+    model_pipeline = []
+    model_pipeline.append(LogisticRegression(solver="liblinear"))
+    model_pipeline.append(SVC())
+    model_pipeline.append(KNeighborsClassifier())
+    model_pipeline.append(tree.DecisionTreeClassifier())
+    model_pipeline.append(RandomForestClassifier())
+    model_pipeline.append(GaussianNB())
+
+    model_list = [
+        "Logistic Regression",
+        "SVM",
+        "KNN",
+        "Decision Tree",
+        "Random Forest",
+        "Naive Bayes",
+    ]
+    acc_list = []
+    auc_list = []
+    cm_list = []
+
+    for model in model_pipeline:
+        model.fit(X_train3, y_train)
+        y_pred = model.predict(X_test3)
+        acc_list.append(metrics.accuracy_score(y_test, y_pred))
+        fpr, tpr, _thresholds = metrics.roc_curve(y_test, y_pred)
+        auc_list.append(round(metrics.auc(fpr, tpr), 2))
+        cm_list.append(confusion_matrix(y_test, y_pred))
+
+    # comparing models
+    results_df3 = pd.DataFrame(
+        {
+            "Model": model_list,
+            "Accuracy": acc_list,
+            "AUC": auc_list,
+            # add ROC
+        }
+    )
     ##################################################
     # TABLE TO HTML
     ##################################################
@@ -617,6 +742,8 @@ def main():
         by=["Weighted Difference of Mean Response"], ascending=False
     )
     results_df = results_df.sort_values(by=["Accuracy"], ascending=False)
+    results_df2 = results_df2.sort_values(by=["Accuracy"], ascending=False)
+    results_df3 = results_df3.sort_values(by=["Accuracy"], ascending=False)
 
     # creating clickable links
     cat_predictors_table = (
@@ -673,6 +800,14 @@ def main():
             + "\n\n"
             + html_string.format(
                 table=results_df.to_html(justify="center", classes="mystyle")
+            )
+            + "\n\n"
+            + html_string.format(
+                table=results_df2.to_html(justify="center", classes="mystyle")
+            )
+            + "\n\n"
+            + html_string.format(
+                table=results_df3.to_html(justify="center", classes="mystyle")
             )
         )
 

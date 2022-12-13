@@ -25,7 +25,7 @@ RUN pip3 install --compile --no-cache-dir -r requirements.txt
 COPY assignment_6.sql assignment_6.sql
 COPY 12560_rolling.sql 12560_rolling.sql
 COPY 100_day_rolling.sql 100_day_rolling.sql
-COPY bashfile.sh bashfile.sh
+COPY test_env/bashfile.sh bashfile.sh
 
 # SQL - making baseball db
 CMD ./bashfile.sh
