@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 import itertools
 import os
 import sys
@@ -26,20 +27,18 @@ def make_clickable(val):
 
 
 def main():
+    print("starting py file")
     warnings.simplefilter(action="ignore", category=FutureWarning)
 
     # CONNECTING TO DB
-    db_user = "root"
-    # pragma: allowlist nextline secret
-    db_pass = "password"
-    db_host = "localhost"
-    db_database = "baseball"
-    # pragma: allowlist nextline secret
-    connect_string = (
-        f"mariadb+mariadbconnector://{db_user}:{db_pass}@{db_host}/{db_database}"
-    )
 
-    sql_engine = sqlalchemy.create_engine(connect_string)
+    print("creating connection to database")
+
+    # what i found on stack overflow
+    # pragma: allowlist nextline secret
+    msqldb_uri = "mariadb+pymysql://root:password@mariadb:3306/baseball?charset=utf8mb4"
+
+    engine = sqlalchemy.create_engine(msqldb_uri)
 
     query = """
         SELECT
@@ -47,7 +46,14 @@ def main():
         FROM
             more_baseball_feats;
     """
-    df = pd.read_sql_query(query, sql_engine)
+    print("loading query into DB")
+    df = pd.read_sql_query(query, engine)
+
+    # dropping useless column(s)
+    # df = df.drop(["home_hso", "home_k_bb", "away_hso", "away_k_bb", "comp_obp", "comp_k_bb",
+    #              "comp_hso", "comp_bb_k", "comp_hrh", "comp_soh", "comp_batting_avg",
+    #              "home_100_day_k_bb_avg", "home_100_day_batting_avg", "home_10_day_batting_avg",
+    #              "home_25_day_batting_avg", "home_50_day_batting_avg"], axis=1)
 
     # making year a category
     df = df.astype({"year": "category", "HomeTeamWins": "category"})
@@ -55,6 +61,7 @@ def main():
     df = df.dropna()
 
     # TRAIN TEST SPLIT
+    print("Creating train test split")
     train_df = df[df["year"] != 2011]
 
     # test will be last year available
@@ -89,6 +96,7 @@ def main():
     # OUTPUT TABLE
     #################################################
 
+    print("creating output table")
     # cont predictors
     cont_predictors_table = pd.DataFrame(columns=["Predictor", "Violin Plot"])
     predictor_l = []
@@ -190,6 +198,7 @@ def main():
     # concating combinations to place in table
     col_combos = ["/".join(map(str, comb)) for comb in itertools.combinations(cols, 2)]
 
+    print("Creating heatmap")
     # heatmap plot for cont/cont predictors
     heat = go.Heatmap(
         z=pearson_corr,
@@ -303,6 +312,8 @@ def main():
     #################################################
     # CONT/CONT BRUTE FORCE TABLE
     #################################################
+
+    print("Creating brute force table")
     brute_force = pd.DataFrame(
         columns=[
             "Predictor 1",
@@ -445,6 +456,8 @@ def main():
     brute_force = brute_force.drop(columns={"joiner", "name", "url"})
     brute_force = brute_force.rename(columns={"name_url": "Predictor 2 Bin Plot"})
 
+    print("finished brute force table")
+
     # creating 2D histograms for each pair
     # fig = px.density_heatmap(X_train, x="obp", y="k_bb", marginal_x="histogram", marginal_y="histogram")
     # fig.show()
@@ -510,6 +523,7 @@ def main():
             temp_df1 = temp_df1.merge(temp_df2, left_on="match", right_on="match2")"""
 
     # add random forest variable importance
+    print("starting variable importance")
     rf = RandomForestRegressor(n_estimators=100)
     rf.fit(X_train, y_train)
 
@@ -547,6 +561,7 @@ def main():
     graph = graphviz.Source(dot_data)
     graph.render("decision_tree")
 
+    print("creating model pipeline")
     # making a model pipeline
     model_pipeline = []
     model_pipeline.append(LogisticRegression(solver="liblinear"))
@@ -592,138 +607,7 @@ def main():
     Going off non over-fit models logistic regression actually performs the best at .78
     Curious as to why RF and DT could be so overfit? I did not think that I had included predictors that 'cheated'
     """
-    ##################################################
-    # MODELING WITHOUT HIGHLY CORR PAIRS .75 CUTOFF
-    ##################################################
-    # making a model pipeline
-    X_train2 = X_train.drop(
-        columns=[
-            "home_20_game_hit2plate_avg",
-            "home_20_game_hrh_avg",
-            "home_20_game_soh_avg",
-            "away_20_game_batting_avg",
-            "home_20_game_safe2plate_avg",
-        ]
-    )
-    X_test2 = X_test.drop(
-        columns=[
-            "home_20_game_hit2plate_avg",
-            "home_20_game_hrh_avg",
-            "home_20_game_soh_avg",
-            "away_20_game_batting_avg",
-            "home_20_game_safe2plate_avg",
-        ]
-    )
 
-    # making a model pipeline
-    model_pipeline = []
-    model_pipeline.append(LogisticRegression(solver="liblinear"))
-    model_pipeline.append(SVC())
-    model_pipeline.append(KNeighborsClassifier())
-    model_pipeline.append(tree.DecisionTreeClassifier())
-    model_pipeline.append(RandomForestClassifier())
-    model_pipeline.append(GaussianNB())
-
-    model_list = [
-        "Logistic Regression",
-        "SVM",
-        "KNN",
-        "Decision Tree",
-        "Random Forest",
-        "Naive Bayes",
-    ]
-    acc_list = []
-    auc_list = []
-    cm_list = []
-
-    for model in model_pipeline:
-        model.fit(X_train2, y_train)
-        y_pred = model.predict(X_test2)
-        acc_list.append(metrics.accuracy_score(y_test, y_pred))
-        fpr, tpr, _thresholds = metrics.roc_curve(y_test, y_pred)
-        auc_list.append(round(metrics.auc(fpr, tpr), 2))
-        cm_list.append(confusion_matrix(y_test, y_pred))
-
-    # comparing models
-    results_df2 = pd.DataFrame(
-        {
-            "Model": model_list,
-            "Accuracy": acc_list,
-            "AUC": auc_list,
-            # add ROC
-        }
-    )
-    ##################################################
-    # MODELING WITH STRONGEST PREDICTORS
-    ##################################################
-    # making a model pipeline
-    X_train3 = X_train.drop(
-        columns=[
-            "away_20_game_safe2plate_avg",
-            "away_20_game_hit2plate_avg",
-            "away_20_game_h2b_avg",
-            "away_20_game_obp_avg",
-            "away_20_game_k_bb_avg",
-            "away_20_game_hso_avg",
-            "away_20_game_bb_k_avg",
-            "away_20_game_hrh_avg",
-            "away_20_game_soh_avg",
-            "away_20_game_batting_avg",
-        ]
-    )
-    X_test3 = X_test.drop(
-        columns=[
-            "away_20_game_safe2plate_avg",
-            "away_20_game_hit2plate_avg",
-            "away_20_game_h2b_avg",
-            "away_20_game_obp_avg",
-            "away_20_game_k_bb_avg",
-            "away_20_game_hso_avg",
-            "away_20_game_bb_k_avg",
-            "away_20_game_hrh_avg",
-            "away_20_game_soh_avg",
-            "away_20_game_batting_avg",
-        ]
-    )
-
-    # making a model pipeline
-    model_pipeline = []
-    model_pipeline.append(LogisticRegression(solver="liblinear"))
-    model_pipeline.append(SVC())
-    model_pipeline.append(KNeighborsClassifier())
-    model_pipeline.append(tree.DecisionTreeClassifier())
-    model_pipeline.append(RandomForestClassifier())
-    model_pipeline.append(GaussianNB())
-
-    model_list = [
-        "Logistic Regression",
-        "SVM",
-        "KNN",
-        "Decision Tree",
-        "Random Forest",
-        "Naive Bayes",
-    ]
-    acc_list = []
-    auc_list = []
-    cm_list = []
-
-    for model in model_pipeline:
-        model.fit(X_train3, y_train)
-        y_pred = model.predict(X_test3)
-        acc_list.append(metrics.accuracy_score(y_test, y_pred))
-        fpr, tpr, _thresholds = metrics.roc_curve(y_test, y_pred)
-        auc_list.append(round(metrics.auc(fpr, tpr), 2))
-        cm_list.append(confusion_matrix(y_test, y_pred))
-
-    # comparing models
-    results_df3 = pd.DataFrame(
-        {
-            "Model": model_list,
-            "Accuracy": acc_list,
-            "AUC": auc_list,
-            # add ROC
-        }
-    )
     ##################################################
     # TABLE TO HTML
     ##################################################
@@ -742,8 +626,6 @@ def main():
         by=["Weighted Difference of Mean Response"], ascending=False
     )
     results_df = results_df.sort_values(by=["Accuracy"], ascending=False)
-    results_df2 = results_df2.sort_values(by=["Accuracy"], ascending=False)
-    results_df3 = results_df3.sort_values(by=["Accuracy"], ascending=False)
 
     # creating clickable links
     cat_predictors_table = (
@@ -800,14 +682,6 @@ def main():
             + "\n\n"
             + html_string.format(
                 table=results_df.to_html(justify="center", classes="mystyle")
-            )
-            + "\n\n"
-            + html_string.format(
-                table=results_df2.to_html(justify="center", classes="mystyle")
-            )
-            + "\n\n"
-            + html_string.format(
-                table=results_df3.to_html(justify="center", classes="mystyle")
             )
         )
 
