@@ -312,6 +312,7 @@ def main():
     )
 
     # getting list of predictor pairs
+    brute_force["Predictor Pair"] = output_table["Predictors"]
     brute_force[["Predictor 1", "Predictor 2"]] = output_table["Predictors"].str.split(
         "/", expand=True
     )
@@ -447,14 +448,15 @@ def main():
     brute_force = brute_force.rename(columns={"name_url": "Predictor 2 Bin Plot"})
 
     # creating 2D histograms for each pair
-    # fig = px.density_heatmap(X_train, x="obp", y="k_bb", marginal_x="histogram", marginal_y="histogram")
-    # fig.show()
-    """for column1 in train_cont:
+    names = []
+    urls = []
+
+    for column1 in train_cont:
         temp_df1 = pd.DataFrame()  # initialize df to store calcs
         temp_df1[column1] = train_cont[column1]  # take col of interest for calcs
         sample_mean = temp_df1[column1].mean()  # get mean of col
         temp_df1["bin"] = pd.cut(
-            train_cont[column1], 10, right=True
+            train_cont[column1], 7, right=True
         )  # separate into 10 bins
         temp_df1["sample_mean"] = sample_mean  # set new col to mean
         temp_df1["bin_mean"] = temp_df1.groupby("bin")[column1].transform(
@@ -466,49 +468,48 @@ def main():
         temp_df1 = temp_df1.drop(columns=[column1])  # dropping base col to condense df
         temp_df1["diff_mean_resp"] = (
             (temp_df1["bin_mean"] - temp_df1["sample_mean"]) ** 2
-        ) / 10  # calc mse
-        temp_df1 = temp_df1.drop_duplicates().sort_values(
-            by="bin", ascending=True
-        )  # dropping dup cols
-        temp_df1["population_proportion"] = temp_df1["bin_count"].divide(
-            temp_df1["bin_count"].sum()
-        )  # calc pop prop
-        temp_df1["weighted_diff"] = temp_df1["diff_mean_resp"].multiply(
-            temp_df1["population_proportion"]
-        )  # wmse
-        temp_df1["match"] = np.arange(temp_df1.shape[0])
-        # print(temp_df1.head())
+        ) / 7  # calc mse
         for column2 in train_cont:
-            temp_df2 = pd.DataFrame()  # initialize df to store calcs
-            temp_df2[column2] = train_cont[column2]  # take col of interest for calcs
-            sample_mean = temp_df2[column2].mean()  # get mean of col
-            temp_df2["bin2"] = pd.cut(
-                train_cont[column2], 10, right=True
-            )  # separate into 10 bins
-            temp_df2["sample_mean2"] = sample_mean  # set new col to mean
-            temp_df2["bin_mean2"] = temp_df2.groupby("bin2")[column2].transform(
-                "mean"
-            )  # get mean of each bin
-            temp_df2["bin_count2"] = temp_df2.groupby("bin2")[column2].transform(
-                "count"
-            )  # get count of each bin
-            temp_df2 = temp_df2.drop(
-                columns=[column2]
-            )  # dropping base col to condense df
-            temp_df2["diff_mean_resp2"] = (
-                (temp_df2["bin_mean2"] - temp_df2["sample_mean2"]) ** 2
-            ) / 10  # calc mse
-            temp_df2 = temp_df2.drop_duplicates().sort_values(
-                by="bin2", ascending=True
-            )  # dropping dup cols
-            temp_df2["population_proportion2"] = temp_df2["bin_count2"].divide(
-                temp_df2["bin_count2"].sum()
-            )  # calc pop prop
-            temp_df2["weighted_diff2"] = temp_df2["diff_mean_resp2"].multiply(
-                temp_df2["population_proportion2"]
-            )  # wmse
-            temp_df2["match2"] = np.arange(temp_df2.shape[0])
-            temp_df1 = temp_df1.merge(temp_df2, left_on="match", right_on="match2")"""
+            if brute_force["Predictor Pair"].str.contains(f"{column1}/{column2}").any():
+                temp_df1[column2] = train_cont[
+                    column2
+                ]  # take col of interest for calcs
+                sample_mean = temp_df1[column2].mean()  # get mean of col
+                temp_df1["bin2"] = pd.cut(
+                    train_cont[column2], 7, right=True
+                )  # separate into 10 bins
+                temp_df1["sample_mean2"] = sample_mean  # set new col to mean
+                temp_df1["bin_mean2"] = temp_df1.groupby("bin2")[column2].transform(
+                    "mean"
+                )  # get mean of each bin
+                temp_df1["bin_count2"] = temp_df1.groupby("bin2")[column2].transform(
+                    "count"
+                )  # get count of each bin
+                temp_df1 = temp_df1.drop(
+                    columns=[column2]
+                )  # dropping base col to condense df
+                temp_df1["diff_mean_resp2"] = (
+                    (temp_df1["bin_mean2"] - temp_df1["sample_mean2"]) ** 2
+                ) / 7  # calc mse
+                brute_force_pairs = px.density_heatmap(
+                    temp_df1,
+                    x="bin_mean",
+                    y="bin_mean2",
+                    title=f"{column1}/{column2}_bruteforce_plot",
+                    labels={"bin_mean": f"{column1}", "bin_mean2": f"{column2}"},
+                )
+                brute_force_pairs.write_html(
+                    file=f"graphs/{column1}_{column2}brute_force_plot"
+                )
+
+                # add links
+                names.append(f"{column1}_{column2}_brute_force_plot")
+                urls.append(f"{column1}_{column2}_brute_force_plot.html")
+
+    links_df["name"] = names
+    links_df["url"] = urls
+    links_df["name_url"] = links_df["name"] + "#" + links_df["url"]
+    brute_force["Brute Force Plot"] = links_df["name_url"]
 
     # add random forest variable importance
     rf = RandomForestRegressor(n_estimators=100)
@@ -769,6 +770,7 @@ def main():
             {
                 "Predictor 1 Bin Plot": make_clickable,
                 "Predictor 2 Bin Plot": make_clickable,
+                "Brute Force Plot": make_clickable,
             }
         )
         .hide_index()
