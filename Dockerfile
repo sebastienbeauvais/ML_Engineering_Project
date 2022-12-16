@@ -18,14 +18,13 @@ RUN apt-get update \
 COPY requirements.txt .
 RUN wget https://dlm.mariadb.com/2678574/Connectors/c/connector-c-3.3.3/mariadb-connector-c-3.3.3-debian-bullseye-amd64.tar.gz -O - | tar -zxf - --strip-components=1 -C /usr
 RUN pip3 install --upgrade pip
-# RUN pip3 install scikit-learn
-# RUN pip3 install mariadb
 RUN pip3 install --compile --no-cache-dir -r requirements.txt
 
 # Copy files
 COPY more_baseball_features.sql more_baseball_features.sql
-COPY final.py final.py
 COPY bashfile.sh bashfile.sh
+COPY final.py final.py
+COPY baseball_features.sql baseball_features.sql
 
 # SQL - making baseball db
 CMD ./bashfile.sh

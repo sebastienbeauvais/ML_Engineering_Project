@@ -53,6 +53,9 @@ def main():
     df = df.astype({"year": "category", "HomeTeamWins": "category"})
     # filling nan
     df = df.dropna()
+    # removing degree from temp
+    df["temp"] = df["temp"].str.replace(" degrees", "")
+    df["temp"] = df["temp"].astype(int)
 
     # TRAIN TEST SPLIT
     train_df = df[df["year"] != 2011]
@@ -86,17 +89,25 @@ def main():
         print("Directory '%s' cannot be created" % dir, error)
 
     #################################################
-    # OUTPUT TABLE
+    # PREDICTORS TABLE
     #################################################
-    # ADD HISTOGRAM PLOTS
 
     # cont predictors
     cont_predictors_table = pd.DataFrame(columns=["Predictor", "Violin Plot"])
     predictor_l = []
     violin_l = []
+    hist_l = []
     names = []
     urls = []
     links_df = pd.DataFrame(
+        columns=[
+            "name",
+            "url",
+        ]
+    )
+    names2 = []
+    urls2 = []
+    links_df2 = pd.DataFrame(
         columns=[
             "name",
             "url",
@@ -113,12 +124,21 @@ def main():
             color="HomeTeamWins",
             box=True,
         )
+        hist = px.histogram(
+            train_holder, x=train_holder[column], marginal="rug", color="HomeTeamWins"
+        )
         violin_l.append(f"{column}_violin_plot")
         violin.write_html(f"graphs/{column}_violin_plot.html")
+
+        hist_l.append(f"{column}_histogram")
+        hist.write_html(f"graphs/{column}_histogram.html")
 
         # add links
         names.append(f"{column}_violin_plot")
         urls.append(f"graphs/{column}_violin_plot.html")
+
+        names2.append(f"{column}_histogram")
+        urls2.append(f"graphs/{column}_histogram.html")
 
     cont_predictors_table["Predictor"] = predictor_l
 
@@ -126,6 +146,11 @@ def main():
     links_df["url"] = urls
     links_df["name_url"] = links_df["name"] + "#" + links_df["url"]
     cont_predictors_table["Violin Plot"] = links_df["name_url"]
+
+    links_df2["name"] = names2
+    links_df2["url"] = urls2
+    links_df2["name_url"] = links_df2["name"] + "#" + links_df2["url"]
+    cont_predictors_table["Histogram"] = links_df2["name_url"]
 
     cont_predictors_table = cont_predictors_table.drop(
         cont_predictors_table.tail(1).index
@@ -168,6 +193,10 @@ def main():
     cat_predictors_table["Comp Plot"] = links_df["name_url"]
 
     cat_predictors_table = cat_predictors_table.drop(cat_predictors_table.tail(1).index)
+
+    #################################################
+    # OUTPUT TABLE
+    #################################################
 
     # defining table
     output_table = pd.DataFrame(
@@ -431,6 +460,7 @@ def main():
     brute_force["Weighted Difference of Mean Response"] = (
         brute_force["weighted_mse_1"] * brute_force["weighted_mse_2"]
     )
+
     brute_force = brute_force.drop(
         ["mse_1", "mse_2", "weighted_mse_1", "weighted_mse_2"], axis=1
     )
@@ -450,66 +480,79 @@ def main():
     # creating 2D histograms for each pair
     names = []
     urls = []
+    if len(train_cont.axes[1]) >= 2:
+        for column1 in train_cont:
+            for column2 in train_cont:
+                if (
+                    brute_force["Predictor Pair"]
+                    .str.contains(f"{column1}/{column2}")
+                    .any()
+                ):
+                    temp_df1 = pd.DataFrame()  # initialize df to store calcs
+                    temp_df1[column1] = train_cont[
+                        column1
+                    ]  # take col of interest for calcs
+                    sample_mean = temp_df1[column1].mean()  # get mean of col
+                    temp_df1["bin"] = pd.cut(
+                        train_cont[column1], 7, right=True
+                    )  # separate into 10 bins
+                    temp_df1["sample_mean"] = sample_mean  # set new col to mean
+                    temp_df1["bin_mean"] = temp_df1.groupby("bin")[column1].transform(
+                        "mean"
+                    )  # get mean of each bin
+                    temp_df1["bin_count"] = temp_df1.groupby("bin")[column1].transform(
+                        "count"
+                    )  # get count of each bin
+                    temp_df1 = temp_df1.drop(
+                        columns=[column1]
+                    )  # dropping base col to condense df
+                    temp_df1["diff_mean_resp"] = (
+                        (temp_df1["bin_mean"] - temp_df1["sample_mean"]) ** 2
+                    ) / 7  # calc mse
+                    temp_df1[column2] = train_cont[
+                        column2
+                    ]  # take col of interest for calcs
+                    sample_mean = temp_df1[column2].mean()  # get mean of col
+                    temp_df1["bin2"] = pd.cut(
+                        train_cont[column2], 7, right=True
+                    )  # separate into 10 bins
+                    temp_df1["sample_mean2"] = sample_mean  # set new col to mean
+                    temp_df1["bin_mean2"] = temp_df1.groupby("bin2")[column2].transform(
+                        "mean"
+                    )  # get mean of each bin
+                    temp_df1["bin_count2"] = temp_df1.groupby("bin2")[
+                        column2
+                    ].transform(
+                        "count"
+                    )  # get count of each bin
+                    temp_df1 = temp_df1.drop(
+                        columns=[column2]
+                    )  # dropping base col to condense df
+                    temp_df1["diff_mean_resp2"] = (
+                        (temp_df1["bin_mean2"] - temp_df1["sample_mean2"]) ** 2
+                    ) / 7  # calc mse
+                    brute_force_pairs = px.density_heatmap(
+                        temp_df1,
+                        x="bin_mean",
+                        y="bin_mean2",
+                        title=f"{column1}/{column2}_bruteforce_plot",
+                        labels={"bin_mean": f"{column1}", "bin_mean2": f"{column2}"},
+                    )
+                    brute_force_pairs.write_html(
+                        f"graphs/{column1}*{column2}_brute_force_plot.html"
+                    )
 
-    for column1 in train_cont:
-        temp_df1 = pd.DataFrame()  # initialize df to store calcs
-        temp_df1[column1] = train_cont[column1]  # take col of interest for calcs
-        sample_mean = temp_df1[column1].mean()  # get mean of col
-        temp_df1["bin"] = pd.cut(
-            train_cont[column1], 7, right=True
-        )  # separate into 10 bins
-        temp_df1["sample_mean"] = sample_mean  # set new col to mean
-        temp_df1["bin_mean"] = temp_df1.groupby("bin")[column1].transform(
-            "mean"
-        )  # get mean of each bin
-        temp_df1["bin_count"] = temp_df1.groupby("bin")[column1].transform(
-            "count"
-        )  # get count of each bin
-        temp_df1 = temp_df1.drop(columns=[column1])  # dropping base col to condense df
-        temp_df1["diff_mean_resp"] = (
-            (temp_df1["bin_mean"] - temp_df1["sample_mean"]) ** 2
-        ) / 7  # calc mse
-        for column2 in train_cont:
-            if brute_force["Predictor Pair"].str.contains(f"{column1}/{column2}").any():
-                temp_df1[column2] = train_cont[
-                    column2
-                ]  # take col of interest for calcs
-                sample_mean = temp_df1[column2].mean()  # get mean of col
-                temp_df1["bin2"] = pd.cut(
-                    train_cont[column2], 7, right=True
-                )  # separate into 10 bins
-                temp_df1["sample_mean2"] = sample_mean  # set new col to mean
-                temp_df1["bin_mean2"] = temp_df1.groupby("bin2")[column2].transform(
-                    "mean"
-                )  # get mean of each bin
-                temp_df1["bin_count2"] = temp_df1.groupby("bin2")[column2].transform(
-                    "count"
-                )  # get count of each bin
-                temp_df1 = temp_df1.drop(
-                    columns=[column2]
-                )  # dropping base col to condense df
-                temp_df1["diff_mean_resp2"] = (
-                    (temp_df1["bin_mean2"] - temp_df1["sample_mean2"]) ** 2
-                ) / 7  # calc mse
-                brute_force_pairs = px.density_heatmap(
-                    temp_df1,
-                    x="bin_mean",
-                    y="bin_mean2",
-                    title=f"{column1}/{column2}_bruteforce_plot",
-                    labels={"bin_mean": f"{column1}", "bin_mean2": f"{column2}"},
-                )
-                brute_force_pairs.write_html(
-                    file=f"graphs/{column1}_{column2}brute_force_plot"
-                )
-
-                # add links
-                names.append(f"{column1}_{column2}_brute_force_plot")
-                urls.append(f"{column1}_{column2}_brute_force_plot.html")
+                    # add links
+                    names.append(f"{column1}*{column2}_brute_force_plot")
+                    urls.append(f"graphs/{column1}*{column2}_brute_force_plot.html")
 
     links_df["name"] = names
     links_df["url"] = urls
     links_df["name_url"] = links_df["name"] + "#" + links_df["url"]
     brute_force["Brute Force Plot"] = links_df["name_url"]
+
+    # dropping extra column
+    brute_force = brute_force.drop(columns=["Predictor Pair"], axis=1)
 
     # add random forest variable importance
     rf = RandomForestRegressor(n_estimators=100)
@@ -523,6 +566,8 @@ def main():
         orientation="h",
         title="Random Forest Feature Importance",
     )
+    feat_bar.update_yaxes(categoryorder="total ascending")
+
     feat_bar.write_html("graphs/random_forest_classifier.html")
 
     # add t-score and p-val
@@ -588,12 +633,6 @@ def main():
         }
     )
 
-    """
-    Best model is Random Forest based on accuracy of prediction. Most likely over-fit due to the accuracy being 1.
-    Second best is Decision Tree with .99 accuracy followed by KNN at .98. Both probably over-fit...
-    Going off non over-fit models logistic regression actually performs the best at .78
-    Curious as to why RF and DT could be so overfit? I did not think that I had included predictors that 'cheated'
-    """
     ##################################################
     # MODELING WITHOUT HIGHLY CORR PAIRS .75 CUTOFF
     ##################################################
@@ -605,6 +644,7 @@ def main():
             "home_20_game_soh_avg",
             "away_20_game_batting_avg",
             "home_20_game_safe2plate_avg",
+            "temp",
         ]
     )
     X_test2 = X_test.drop(
@@ -614,6 +654,7 @@ def main():
             "home_20_game_soh_avg",
             "away_20_game_batting_avg",
             "home_20_game_safe2plate_avg",
+            "temp",
         ]
     )
 
@@ -671,6 +712,7 @@ def main():
             "away_20_game_hrh_avg",
             "away_20_game_soh_avg",
             "away_20_game_batting_avg",
+            "temp",
         ]
     )
     X_test3 = X_test.drop(
@@ -685,6 +727,7 @@ def main():
             "away_20_game_hrh_avg",
             "away_20_game_soh_avg",
             "away_20_game_batting_avg",
+            "temp",
         ]
     )
 
@@ -740,9 +783,12 @@ def main():
     </html>.
     """
     # sorting values
-    brute_force = brute_force.sort_values(
-        by=["Weighted Difference of Mean Response"], ascending=False
-    )
+    output_table = output_table.sort_values(by=["p-score"], ascending=False)
+    # this is breaking plots to preds line-up
+    # brute_force = brute_force.sort_values(
+    #    by=["Weighted Difference of Mean Response"], ascending=False
+    # )
+
     results_df = results_df.sort_values(by=["Accuracy"], ascending=False)
     results_df2 = results_df2.sort_values(by=["Accuracy"], ascending=False)
     results_df3 = results_df3.sort_values(by=["Accuracy"], ascending=False)
@@ -756,7 +802,7 @@ def main():
 
     cont_predictors_table = (
         cont_predictors_table.style.set_properties(**{"text=align": "center"})
-        .format({"Violin Plot": make_clickable})
+        .format({"Violin Plot": make_clickable, "Histogram": make_clickable})
         .hide_index()
     )
     output_table = (

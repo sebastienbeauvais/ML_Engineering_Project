@@ -18,21 +18,13 @@ else
 fi
 
 # Creating features
-echo "Checking if tables exist..."
-#if [[ $(mysql -u root -ppassword -h mariadb -e\
-#    "select count(*) from information_schema.tables where table_schema='baseball'\
-#    and table_name='more_baseball_features';") ]]; then
-#    echo "Features exist"
-#else
-#    echo "Features do not exist"
-#    echo "Creating features. This may take a few moments..."
-#    mysql -u root -ppassword -h mariadb baseball < more_baseball_features.sql
-#    echo "Finished creating features"
-#fi
 echo "Creating sql features..."
 mysql -u root -ppassword -h mariadb baseball < more_baseball_features.sql
 echo "Features created"
 
-echo "Running models..."
-# python3 final.py
-echo "Finished running models"
+echo "Creating CSV"
+mysql -u root -ppassword -h mariadb baseball < baseball_features.sql > ./baseball_features.txt
+
+echo "Building model..."
+python3 final.py
+echo "Finished building model"

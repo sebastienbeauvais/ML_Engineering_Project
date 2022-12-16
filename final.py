@@ -9,7 +9,9 @@ import numpy as np
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objs as go
-import sqlalchemy
+
+# import pymysql
+# import sqlalchemy
 from plotly.subplots import make_subplots
 from sklearn import metrics, tree
 from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
@@ -34,41 +36,58 @@ def main():
 
     print("creating connection to database")
 
-    # what i found on stack overflow
+    """# CONNECTING TO DB
+    db_user = "root"
     # pragma: allowlist nextline secret
-    msqldb_uri = "mariadb+pymysql://root:password@mariadb:3306/baseball?charset=utf8mb4"
+    db_pass = "password"
+    db_host = "localhost"
+    db_database = "baseball"
+    # pragma: allowlist nextline secret
+    connect_string = (
+        f"mariadb+mariadbconnector://{db_user}:{db_pass}@{db_host}/{db_database}"
+    )
 
+    sql_engine = sqlalchemy.create_engine(connect_string)"""
+
+    # query = """
+    #    SELECT
+    #        *
+    #    FROM
+    #        more_baseball_feats;
+    # """
+    # df = pd.read_sql_query(query, sql_engine)
+    # pragma: allowlist nextline secret
+    """msqldb_uri = "mariadb+pymysql://root:password@mariadb:3306/baseball?charset=utf8mb4"
     engine = sqlalchemy.create_engine(msqldb_uri)
+    df = pd.read_sql_query(query, engine)"""
 
-    query = """
-        SELECT
-            *
-        FROM
-            more_baseball_feats;
-    """
-    print("loading query into DB")
-    df = pd.read_sql_query(query, engine)
-
-    # dropping useless column(s)
-    # df = df.drop(["home_hso", "home_k_bb", "away_hso", "away_k_bb", "comp_obp", "comp_k_bb",
-    #              "comp_hso", "comp_bb_k", "comp_hrh", "comp_soh", "comp_batting_avg",
-    #              "home_100_day_k_bb_avg", "home_100_day_batting_avg", "home_10_day_batting_avg",
-    #              "home_25_day_batting_avg", "home_50_day_batting_avg"], axis=1)
+    df = pd.read_csv("baseball_features.txt", sep="\t")
+    print(df)
+    """df = df.columns=["game_year", "temp", "home_20_game_batting_avg", "away_20_game_batting_avg", "home_20_game_soh_avg",
+                     "away_20_game_soh_avg", "home_20_game_hrh_avg", "away_20_game_hrh_avg", "home_20_game_bb_k_avg",
+                     "away_20_game_bb_k_avg", "home_20_game_hso_avg", "away_20_game_hso_avg", "home_20_game_k_bb_avg",
+                     "away_20_game_k_bb_avg", "home_20_game_obp_avg", "away_20_game_obp_avg", "home_20_game_h2b_avg",
+                     "away_20_game_h2b_avg", "home_20_game_hit2plate_avg", "away_20_game_hit2plate_avg",
+                     "home_20_game_safe2plate_avg", "away_20_game_safe2plate_avg", "diff_batting_avg", "diff_soh_avg",
+                     "diff_hrh_avg", "diff_bb_k_avg", "diff_hso_avg", "diff_k_bb_avg", "diff_obp_avg", "diff_BABIP_avg",
+                     "diff_h2b_avg", "diff_hit2plate_avg", "diff_safe2plate_avg", "HomeTeamWins"]"""
 
     # making year a category
-    df = df.astype({"year": "category", "HomeTeamWins": "category"})
+    df = df.astype({"game_year": "category", "HomeTeamWins": "category"})
     # filling nan
     df = df.dropna()
 
+    print(df.head())
+
     # TRAIN TEST SPLIT
     print("Creating train test split")
-    train_df = df[df["year"] != 2011]
+    train_df = df[df["game_year"] != 2011]
 
     # test will be last year available
-    test_df = df[df["year"] == 2011]
+    test_df = df[df["game_year"] == 2011]
 
-    train_df = train_df.drop(columns=["year"])
-    test_df = test_df.drop(columns=["year"])
+    train_df = train_df.drop(columns=["game_year"])
+    test_df = test_df.drop(columns=["game_year"])
 
     X_train = train_df.loc[:, train_df.columns != "HomeTeamWins"]
     y_train = train_df.loc[:, train_df.columns == "HomeTeamWins"]
@@ -457,6 +476,8 @@ def main():
     brute_force = brute_force.rename(columns={"name_url": "Predictor 2 Bin Plot"})
 
     print("finished brute force table")
+    print(brute_force.head())
+    # print(break-point)
 
     # creating 2D histograms for each pair
     # fig = px.density_heatmap(X_train, x="obp", y="k_bb", marginal_x="histogram", marginal_y="histogram")
@@ -684,6 +705,7 @@ def main():
                 table=results_df.to_html(justify="center", classes="mystyle")
             )
         )
+    sys.exit()
 
 
 if __name__ == "__main__":

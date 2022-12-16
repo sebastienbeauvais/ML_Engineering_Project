@@ -1,28 +1,32 @@
 ####################################################################
 # HOME TEAM WINS
 ####################################################################
+-- DROP TABLE IF EXISTS home_team_wins;
 CREATE OR REPLACE TABLE home_team_wins
 SELECT
-    EXTRACT(YEAR FROM tr.local_date) AS year
+    EXTRACT(YEAR FROM tr.local_date) AS game_year
     , tr.game_id
     , tr.team_id
+    , bs.temp
     , CASE
         WHEN tr.home_away = 'H' AND tr.win_lose = 'W' THEN 1
         ELSE 0
     END AS HomeTeamWins
 FROM
     team_results tr
+JOIN boxscore bs
+ON bs.game_id = tr.game_id
 WHERE tr.home_away = 'H'
 ;
 
 #####################################################################
 # GETTING HOME TEAM BATTING STATS
 #####################################################################
-DROP TABLE IF EXISTS home_batting_stats
 CREATE OR REPLACE TABLE home_batting_stats
 SELECT
-    EXTRACT(YEAR FROM g.local_date) AS year
+    EXTRACT(YEAR FROM g.local_date) AS game_year
     , htw.game_id
+    , htw.temp
     , g.home_team_id AS home_team
     , CASE
         WHEN tbc.atBat = 0 THEN 0
@@ -66,10 +70,9 @@ ORDER BY
 #####################################################################
 # GETTING HOME TEAM PITCHING STATS
 #####################################################################
-DROP TABLE IF EXISTS  home_pitching_stats
 CREATE OR REPLACE TABLE home_pitching_stats
 SELECT
-    EXTRACT(YEAR FROM g.local_date) AS year
+    EXTRACT(YEAR FROM g.local_date) AS game_year
     , htw.game_id
     , g.home_team_id AS home_team
     , CASE
@@ -102,10 +105,9 @@ ORDER BY
 #####################################################################
 # GETTING AWAY TEAM STATS
 #####################################################################
-DROP TABLE IF EXISTS away_batting_stats
 CREATE OR REPLACE TABLE away_batting_stats
 SELECT
-    EXTRACT(YEAR FROM g.local_date) AS year
+    EXTRACT(YEAR FROM g.local_date) AS game_year
     , htw.game_id
     , g.away_team_id AS away_team
     , CASE
@@ -150,10 +152,9 @@ ORDER BY
 #####################################################################
 # GETTING AWAY TEAM PITCHING STATS
 #####################################################################
-DROP TABLE IF EXISTS  away_pitching_stats
 CREATE OR REPLACE TABLE away_pitching_stats
 SELECT
-    EXTRACT(YEAR FROM g.local_date) AS year
+    EXTRACT(YEAR FROM g.local_date) AS game_year
     , htw.game_id
     , g.away_team_id AS away_team
     , CASE
@@ -186,7 +187,6 @@ ORDER BY
 #####################################################################
 # HOME TEAM STATS
 #####################################################################
-DROP TABLE IF EXISTS  home_team_stats
 CREATE OR REPLACE TABLE home_team_stats
 SELECT
     hbs.*
@@ -202,7 +202,6 @@ ON hbs.game_id = hps.game_id;
 #####################################################################
 # AWAY TEAM STATS
 #####################################################################
-DROP TABLE IF EXISTS  away_team_stats
 CREATE OR REPLACE TABLE away_team_stats
 SELECT
     abs.*
@@ -218,7 +217,6 @@ ON abs.game_id = aps.game_id;
 #####################################################################
 # FINAL QUERY
 #####################################################################
-DROP TABLE IF EXISTS baseball_feats
 CREATE OR REPLACE TABLE baseball_feats
 SELECT
     hts.*
@@ -282,10 +280,10 @@ LEFT JOIN home_team_wins htw
 ON htw.game_id = hts.game_id
 GROUP BY hts.game_id;
 
-DROP TABLE IF EXISTS more_baseball_feats
 CREATE OR REPLACE TABLE more_baseball_feats
 SELECT
-    year
+    game_year
+    , temp
     , home_20_game_batting_avg
     , away_20_game_batting_avg
     , home_20_game_soh_avg

@@ -11,7 +11,7 @@ services:
       - MYSQL_ROOT_PASSWORD=password
       - TZ=Europe/London
     volumes:
-      #- ./.db:/config
+      # - ./.db:/config
       - ./.db:/var/lib/mysql
     ports:
       - "5306:3306"
@@ -27,6 +27,5 @@ services:
     restart: on-failure
     volumes:
       - "./more_baseball_features.sql:/app/more_baseball_features.sql"
-      - "./final.py:/app/final.py"
       - "./baseball.sql:/app/baseball.sql"
-      - "./output:/app/output"
+      - "./final.py:/app/final.py"
