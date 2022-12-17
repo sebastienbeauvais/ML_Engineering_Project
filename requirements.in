@@ -11,4 +11,4 @@ scikit-learn
 statsmodels
 scipy
 seaborn
-sqlalchemy==2.0.0b1
+sqlalchemy==1.4.44
