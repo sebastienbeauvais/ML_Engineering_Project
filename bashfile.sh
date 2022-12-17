@@ -19,12 +19,13 @@ fi
 
 # Creating features
 echo "Creating sql features..."
-mysql -u root -ppassword -h mariadb baseball < more_baseball_features.sql
+mysql -u root -ppassword -h mariadb baseball < test_env.sql
 echo "Features created"
 
-echo "Creating CSV"
-mysql -u root -ppassword -h mariadb baseball < baseball_features.sql > ./baseball_features.txt
-
 echo "Building model..."
-python3 final.py
+python3 test_env.py
 echo "Finished building model"
+
+echo "Opening HTML file"
+cat ./test_env.html
+echo "Done running script"

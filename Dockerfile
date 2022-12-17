@@ -21,10 +21,12 @@ RUN pip3 install --upgrade pip
 RUN pip3 install --compile --no-cache-dir -r requirements.txt
 
 # Copy files
-COPY more_baseball_features.sql more_baseball_features.sql
+#COPY more_baseball_features.sql more_baseball_features.sql
+COPY test_env.sql test_env.sql
 COPY bashfile.sh bashfile.sh
-COPY final.py final.py
-COPY baseball_features.sql baseball_features.sql
+#COPY final_baseball.py final_baseball.py
+COPY test_env.py test_env.py
+#COPY baseball_features.sql baseball_features.sql
 
 # SQL - making baseball db
 CMD ./bashfile.sh

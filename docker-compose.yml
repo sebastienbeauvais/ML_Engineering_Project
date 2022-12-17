@@ -26,6 +26,8 @@ services:
       PORT: "8080"
     restart: on-failure
     volumes:
-      - "./more_baseball_features.sql:/app/more_baseball_features.sql"
+      #- "./more_baseball_features.sql:/app/more_baseball_features.sql"
+      - "./test_env.sql:/app/test_env.sql"
       - "./baseball.sql:/app/baseball.sql"
-      - "./final.py:/app/final.py"
+      - "./test_env.py:/app/test_env.py"
+      #- "./final_baseball.py:/app/final_baseball.py"
