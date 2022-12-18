@@ -55,7 +55,6 @@ def main():
 
     print("creating dataframe")
     df = pd.read_sql_query(query, engine)
-
     print("changing data types")
     # making year a category
     df = df.astype({"game_year": "category", "HomeTeamWins": "category"})
@@ -572,12 +571,13 @@ def main():
 
     print("starting model pipeline")
     # making a model pipeline
+    seed = 55
     model_pipeline = []
-    model_pipeline.append(LogisticRegression(solver="liblinear"))
-    model_pipeline.append(SVC())
+    model_pipeline.append(LogisticRegression(solver="liblinear", random_state=seed))
+    model_pipeline.append(SVC(random_state=seed))
     model_pipeline.append(KNeighborsClassifier())
-    model_pipeline.append(tree.DecisionTreeClassifier())
-    model_pipeline.append(RandomForestClassifier())
+    model_pipeline.append(tree.DecisionTreeClassifier(random_state=seed))
+    model_pipeline.append(RandomForestClassifier(random_state=seed))
     model_pipeline.append(GaussianNB())
 
     model_list = [
@@ -638,11 +638,11 @@ def main():
 
     # making a model pipeline
     model_pipeline = []
-    model_pipeline.append(LogisticRegression(solver="liblinear"))
-    model_pipeline.append(SVC())
+    model_pipeline.append(LogisticRegression(solver="liblinear", random_state=seed))
+    model_pipeline.append(SVC(random_state=seed))
     model_pipeline.append(KNeighborsClassifier())
-    model_pipeline.append(tree.DecisionTreeClassifier())
-    model_pipeline.append(RandomForestClassifier())
+    model_pipeline.append(tree.DecisionTreeClassifier(random_state=seed))
+    model_pipeline.append(RandomForestClassifier(random_state=seed))
     model_pipeline.append(GaussianNB())
 
     model_list = [
@@ -712,11 +712,11 @@ def main():
 
     # making a model pipeline
     model_pipeline = []
-    model_pipeline.append(LogisticRegression(solver="liblinear"))
-    model_pipeline.append(SVC())
+    model_pipeline.append(LogisticRegression(solver="liblinear", random_state=seed))
+    model_pipeline.append(SVC(random_state=seed))
     model_pipeline.append(KNeighborsClassifier())
-    model_pipeline.append(tree.DecisionTreeClassifier())
-    model_pipeline.append(RandomForestClassifier())
+    model_pipeline.append(tree.DecisionTreeClassifier(random_state=seed))
+    model_pipeline.append(RandomForestClassifier(random_state=seed))
     model_pipeline.append(GaussianNB())
 
     model_list = [
@@ -755,7 +755,7 @@ def main():
     # formatting for html out
     html_string = """
     <html>
-      <head><title>Assignment 5 Output</title></head>
+      <head><title>Final Output</title></head>
       <link rel="stylesheet" type="text/css" href="my_style.css"/>
       <body>
         {table}
