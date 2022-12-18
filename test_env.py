@@ -832,7 +832,6 @@ def main():
             )
         )
     print("finished writing HTML table")
-    # os.system("start test_env.html")
 
 
 if __name__ == "__main__":
