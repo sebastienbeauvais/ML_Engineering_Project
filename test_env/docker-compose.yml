@@ -2,8 +2,7 @@ version: "3.3"
 
 services:
   mariadb:
-    # image: lscr.io/linuxserver/mariadb:latest
-    image: mariadb:10.10.2
+    image: lscr.io/linuxserver/mariadb:latest #
     container_name: mariadb
     environment:
       - PUID=501
@@ -11,23 +10,18 @@ services:
       - MYSQL_ROOT_PASSWORD=password
       - TZ=Europe/London
     volumes:
-      # - ./.db:/config
-      - ./.db:/var/lib/mysql
+      - ./.db:/config
     ports:
       - "5306:3306"
     restart: always
 
   baseball:
     build:
-      context: .
-      dockerfile: ./Dockerfile
+      context: ..
+      dockerfile: ../Dockerfile
     image: baseball
     environment:
       PORT: "8080"
     restart: on-failure
     volumes:
-      #- "./more_baseball_features.sql:/app/more_baseball_features.sql"
-      - "./test_env.sql:/app/test_env.sql"
       - "./baseball.sql:/app/baseball.sql"
-      - "./test_env.py:/app/test_env.py"
-      #- "./final_baseball.py:/app/final_baseball.py"
